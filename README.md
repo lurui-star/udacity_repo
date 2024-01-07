@@ -5,4 +5,7 @@ This is the repo that contain all the exercise information
 * git add
 * git commit -m
 * git push
+* git checkout -b
+* git branch
+* git status
 
