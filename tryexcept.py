@@ -27,8 +27,18 @@ def num_words(text):
         return num_words
     except AttributeError:
         return "text argument must be a string"
+<<<<<<< HEAD
 
   print(divide_vals(10,5))
     print(divide_vales(10,0))
     print(num_words("This is some text"))
     print(num_words(10)) 
+||||||| 8242a6a
+=======
+    
+    print(divide_vals(10,5))
+    print(divide_vales(10,0))
+    print(num_words("This is some text"))
+    print(num_words(10))
+
+>>>>>>> 1d799e97b0acca0a94fe02cefdf416d6ee8c9309
