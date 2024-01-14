@@ -1,0 +1,54 @@
+{
+    "os": "macOS-10.16-x86_64-i386-64bit",
+    "python": "3.11.5",
+    "heartbeatAt": "2024-01-14T21:11:54.100971",
+    "startedAt": "2024-01-14T21:11:53.396140",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--input_file",
+        "zen.txt",
+        "--artifact_name",
+        "zen_of_python",
+        "--artifact_type",
+        "text_file",
+        "--artifact_description",
+        "20 aphorisms about writting good python code"
+    ],
+    "state": "running",
+    "program": "/Users/ruilu/udacity_repo/upload_artifact.py",
+    "codePathLocal": "upload_artifact.py",
+    "codePath": "upload_artifact.py",
+    "git": {
+        "remote": "https://github.com/lurui87/udacity_repo.git",
+        "commit": "5a99b69fc3c82d1c94afe3d32c033293dfdc1ac1"
+    },
+    "email": null,
+    "root": "/Users/ruilu/udacity_repo",
+    "host": "Ruis-MBP.lan",
+    "username": "ruilu",
+    "executable": "/Users/ruilu/anaconda3/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 2400,
+        "min": 2400,
+        "max": 2400
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2400,
+            "min": 2400,
+            "max": 2400
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 460.4317207336426,
+            "used": 118.97279739379883
+        }
+    },
+    "memory": {
+        "total": 16.0
+    }
+}
