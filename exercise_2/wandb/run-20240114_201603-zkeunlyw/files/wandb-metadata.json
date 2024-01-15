@@ -1,0 +1,54 @@
+{
+    "os": "Darwin-21.4.0-x86_64-i386-64bit",
+    "python": "3.7.12",
+    "heartbeatAt": "2024-01-15T01:16:04.174003",
+    "startedAt": "2024-01-15T01:16:03.483971",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--file_url",
+        "https://raw.githubusercontent.com/scikit-learn/scikit-learn/4dfdfb4e1bb3719628753a4ece995a1b2fa5312a/sklearn/datasets/data/iris.csv",
+        "--artifact_name",
+        "iris",
+        "--artifact_type",
+        "raw_data",
+        "--artifact_description",
+        "This data sets consists of 3 different types of irises\u2019 (Setosa, Versicolour, and Virginica) petal and sepal length"
+    ],
+    "state": "running",
+    "program": "download_data.py",
+    "codePathLocal": "download_data.py",
+    "codePath": "exercise_2/download_data.py",
+    "git": {
+        "remote": "https://github.com/lurui87/udacity_repo.git",
+        "commit": "324c857700a8a768d4ef14933dc7ec0b08981984"
+    },
+    "email": "lurui0421@gmail.com",
+    "root": "/Users/ruilu/udacity_repo",
+    "host": "Ruis-MBP.lan",
+    "username": "ruilu",
+    "executable": "/Users/ruilu/anaconda3/envs/mlflow-26f2e5da27124a4c84f8c7a0394f979bb38aee97/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 2400,
+        "min": 2400,
+        "max": 2400
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2400,
+            "min": 2400,
+            "max": 2400
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 460.4317207336426,
+            "used": 22.191959381103516
+        }
+    },
+    "memory": {
+        "total": 16.0
+    }
+}

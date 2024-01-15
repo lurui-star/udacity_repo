@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_2/mlruns/0/9946cbabd29c44e8bd3a79ddf0da04e7/artifacts
+end_time: 1705281374453
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 9946cbabd29c44e8bd3a79ddf0da04e7
+run_name: delicate-kite-457
+run_uuid: 9946cbabd29c44e8bd3a79ddf0da04e7
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705281236630
+status: 3
+tags: []
+user_id: ruilu

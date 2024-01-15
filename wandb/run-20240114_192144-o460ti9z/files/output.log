@@ -1,0 +1,4 @@
+2024-01-14 19:21:49,631 Creating artifact
+2024-01-14 19:21:49,682 Logging artifact
+[34m[1mwandb[39m[22m: Waiting for artifact iris to be committed...
+[34m[1mwandb[39m[22m: Committed artifact ruilu/exercise_2/iris:v0
