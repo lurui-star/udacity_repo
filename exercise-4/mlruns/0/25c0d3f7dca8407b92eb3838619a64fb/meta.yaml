@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 25c0d3f7dca8407b92eb3838619a64fb
+run_name: enthused-bee-660
+run_uuid: 25c0d3f7dca8407b92eb3838619a64fb
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705453142559
+status: 1
+tags: []
+user_id: ruilu
