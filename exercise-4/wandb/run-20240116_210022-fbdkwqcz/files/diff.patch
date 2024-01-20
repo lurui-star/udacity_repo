@@ -1,0 +1,3844 @@
+diff --git a/.DS_Store b/.DS_Store
+index a1eba29..7fb0816 100644
+Binary files a/.DS_Store and b/.DS_Store differ
+diff --git a/exercise-3/MLproject b/exercise-3/MLproject
+new file mode 100644
+index 0000000..08ed647
+--- /dev/null
++++ b/exercise-3/MLproject
+@@ -0,0 +1,12 @@
++name: download_data
++conda_env: conda.yml
++
++entry_points:
++  main:
++    parameters:
++      hydra_options:
++        description: Hydra parameters to override
++        type: str
++        default: ''
++    command: >-
++      python main.py $(echo {hydra_options})
+diff --git a/exercise-3/conda.yml b/exercise-3/conda.yml
+new file mode 100644
+index 0000000..e6e05f7
+--- /dev/null
++++ b/exercise-3/conda.yml
+@@ -0,0 +1,12 @@
++name: download_data
++channels:
++  - conda-forge
++  - defaults
++dependencies:
++  - requests=2.24.0
++  - pip=20.3.3
++  - mlflow=1.14.1
++  - hydra-core=1.0.6
++  - pip:
++      - wandb==0.10.21
++      - numpy==1.23.4
+\ No newline at end of file
+diff --git a/exercise-3/config.yaml b/exercise-3/config.yaml
+new file mode 100644
+index 0000000..2841a69
+--- /dev/null
++++ b/exercise-3/config.yaml
+@@ -0,0 +1,6 @@
++main:
++  project_name: experiment_3
++  experiment_name: dev
++data:
++  file_url: https://raw.githubusercontent.com/scikit-learn/scikit-learn/4dfdfb4e1bb3719628753a4ece995a1b2fa5312a/sklearn/datasets/data/iris.csv
++
+diff --git a/exercise-3/download_data/MLproject b/exercise-3/download_data/MLproject
+new file mode 100644
+index 0000000..a0aec05
+--- /dev/null
++++ b/exercise-3/download_data/MLproject
+@@ -0,0 +1,25 @@
++name: download_data
++conda_env: conda.yml
++
++entry_points:
++  main:
++    parameters:
++      file_url:
++        description: URL of the file to download
++        type: uri
++      artifact_name:
++        description: Name for the W&B artifact that will be created
++        type: str
++      artifact_type:
++        description: Type of the artifact to create
++        type: str
++        default: raw_data
++      artifact_description:
++        description: Description for the artifact
++        type: str
++
++    command: >-
++      python download_data.py --file_url {file_url} \
++                              --artifact_name {artifact_name} \
++                              --artifact_type {artifact_type} \
++                              --artifact_description {artifact_description}
+diff --git a/exercise-3/download_data/conda.yml b/exercise-3/download_data/conda.yml
+new file mode 100644
+index 0000000..42cd9c8
+--- /dev/null
++++ b/exercise-3/download_data/conda.yml
+@@ -0,0 +1,9 @@
++name: download_data
++channels:
++  - conda-forge
++  - defaults
++dependencies:
++  - requests=2.24.0
++  - pip=20.3.3
++  - pip:
++      - wandb==0.10.21
+\ No newline at end of file
+diff --git a/exercise-3/download_data/download_data.py b/exercise-3/download_data/download_data.py
+new file mode 100644
+index 0000000..873ea37
+--- /dev/null
++++ b/exercise-3/download_data/download_data.py
+@@ -0,0 +1,76 @@
++#!/usr/bin/env python
++import argparse
++import logging
++import pathlib
++import wandb
++import requests
++import tempfile
++
++
++logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
++logger = logging.getLogger()
++
++
++def go(args):
++
++    # Derive the base name of the file from the URL
++    basename = pathlib.Path(args.file_url).name.split("?")[0].split("#")[0]
++
++    # Download file, streaming so we can download files larger than
++    # the available memory. We use a named temporary file that gets
++    # destroyed at the end of the context, so we don't leave anything
++    # behind and the file gets removed even in case of errors
++    logger.info(f"Downloading {args.file_url} ...")
++    with tempfile.NamedTemporaryFile(mode='wb+') as fp:
++
++        logger.info("Creating run")
++        with wandb.init(job_type="download_data") as run:
++            # Download the file streaming and write to open temp file
++            with requests.get(args.file_url, stream=True) as r:
++                for chunk in r.iter_content(chunk_size=8192):
++                    fp.write(chunk)
++
++            # Make sure the file has been written to disk before uploading
++            # to W&B
++            fp.flush()
++
++            logger.info("Creating artifact")
++            artifact = wandb.Artifact(
++                name=args.artifact_name,
++                type=args.artifact_type,
++                description=args.artifact_description,
++                metadata={'original_url': args.file_url}
++            )
++            artifact.add_file(fp.name, name=basename)
++
++            logger.info("Logging artifact")
++            run.log_artifact(artifact)
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(
++        description="Download a file and upload it as an artifact to W&B", fromfile_prefix_chars="@"
++    )
++
++    parser.add_argument(
++        "--file_url", type=str, help="URL to the input file", required=True
++    )
++
++    parser.add_argument(
++        "--artifact_name", type=str, help="Name for the artifact", required=True
++    )
++
++    parser.add_argument(
++        "--artifact_type", type=str, help="Type for the artifact", required=True
++    )
++
++    parser.add_argument(
++        "--artifact_description",
++        type=str,
++        help="Description for the artifact",
++        required=True,
++    )
++
++    args = parser.parse_args()
++
++    go(args)
+diff --git a/exercise-3/main.py b/exercise-3/main.py
+new file mode 100644
+index 0000000..36c57e8
+--- /dev/null
++++ b/exercise-3/main.py
+@@ -0,0 +1,44 @@
++import mlflow
++import os
++import wandb
++import hydra
++from omegaconf import DictConfig
++
++
++# This automatically reads in the configuration
++@hydra.main(config_name='config')
++def go(config: DictConfig):
++
++    # Setup the wandb experiment. All runs will be grouped under this name
++    os.environ["WANDB_PROJECT"] = config["main"]["project_name"]
++    os.environ["WANDB_RUN_GROUP"] = config["main"]["experiment_name"]
++
++    # You can get the path at the root of the MLflow project with this:
++    root_path = hydra.utils.get_original_cwd()
++
++    _ = mlflow.run(
++        os.path.join(root_path, "download_data"),
++        "main",
++        parameters={
++            "file_url": config["data"]["file_url"],
++            "artifact_name": "iris.csv",
++            "artifact_type": "raw_data",
++            "artifact_description": "Input data"
++        },
++    )
++
++    _ = mlflow.run(
++        os.path.join(root_path, "process_data"),
++        "main",
++        parameters={
++            "input_artifact": "iris.csv:latest",
++            "artifact_name": "clean_data.csv",
++            "artifact_type": "processed_data",
++            "artifact_description": "Cleaned data"
++        },
++    )
++
++
++
++if __name__ == "__main__":
++    go()
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/meta.yaml b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/meta.yaml
+new file mode 100644
+index 0000000..0df51d6
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/meta.yaml
+@@ -0,0 +1,15 @@
++artifact_uri: file:///Users/ruilu/udacity_repo/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/artifacts
++end_time: 1705285183375
++entry_point_name: ''
++experiment_id: '0'
++lifecycle_stage: active
++run_id: 45e4f07f7ca64dc6a4912544de62289a
++run_name: stylish-kite-209
++run_uuid: 45e4f07f7ca64dc6a4912544de62289a
++source_name: ''
++source_type: 4
++source_version: ''
++start_time: 1705284866013
++status: 4
++tags: []
++user_id: ruilu
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/params/hydra_options b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/params/hydra_options
+new file mode 100644
+index 0000000..9423090
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/params/hydra_options
+@@ -0,0 +1 @@
++''
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.gitRepoURL b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.gitRepoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.gitRepoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.project.backend b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.project.backend
+new file mode 100644
+index 0000000..c2c027f
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.project.backend
+@@ -0,0 +1 @@
++local
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.project.entryPoint b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.project.entryPoint
+new file mode 100644
+index 0000000..88d050b
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.project.entryPoint
+@@ -0,0 +1 @@
++main
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.project.env b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.project.env
+new file mode 100644
+index 0000000..f79e4cb
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.project.env
+@@ -0,0 +1 @@
++conda
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.runName b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.runName
+new file mode 100644
+index 0000000..3662ac9
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.runName
+@@ -0,0 +1 @@
++stylish-kite-209
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.git.commit b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.git.commit
+new file mode 100644
+index 0000000..cbc1b2f
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.git.commit
+@@ -0,0 +1 @@
++59980f519aec8e14cae91f2eb07079a3d206329f
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.git.repoURL b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.git.repoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.git.repoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.name b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.name
+new file mode 100644
+index 0000000..17f423f
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.name
+@@ -0,0 +1 @@
++file:///Users/ruilu/udacity_repo#exercise-3
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.type b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.type
+new file mode 100644
+index 0000000..53f9167
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.source.type
+@@ -0,0 +1 @@
++PROJECT
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.user b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.user
+new file mode 100644
+index 0000000..80a46ff
+--- /dev/null
++++ b/exercise-3/mlruns/0/45e4f07f7ca64dc6a4912544de62289a/tags/mlflow.user
+@@ -0,0 +1 @@
++ruilu
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/meta.yaml b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/meta.yaml
+new file mode 100644
+index 0000000..ce1cd6e
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/meta.yaml
+@@ -0,0 +1,15 @@
++artifact_uri: file:///Users/ruilu/udacity_repo/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/artifacts
++end_time: 1705450526137
++entry_point_name: ''
++experiment_id: '0'
++lifecycle_stage: active
++run_id: 72f57c74a5f5496ea6a15235b94b6b1a
++run_name: righteous-shrew-446
++run_uuid: 72f57c74a5f5496ea6a15235b94b6b1a
++source_name: ''
++source_type: 4
++source_version: ''
++start_time: 1705450093254
++status: 4
++tags: []
++user_id: ruilu
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/params/hydra_options b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/params/hydra_options
+new file mode 100644
+index 0000000..9423090
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/params/hydra_options
+@@ -0,0 +1 @@
++''
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.gitRepoURL b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.gitRepoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.gitRepoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.project.backend b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.project.backend
+new file mode 100644
+index 0000000..c2c027f
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.project.backend
+@@ -0,0 +1 @@
++local
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.project.entryPoint b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.project.entryPoint
+new file mode 100644
+index 0000000..88d050b
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.project.entryPoint
+@@ -0,0 +1 @@
++main
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.project.env b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.project.env
+new file mode 100644
+index 0000000..f79e4cb
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.project.env
+@@ -0,0 +1 @@
++conda
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.runName b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.runName
+new file mode 100644
+index 0000000..18b11d1
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.runName
+@@ -0,0 +1 @@
++righteous-shrew-446
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.git.commit b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.git.commit
+new file mode 100644
+index 0000000..cbc1b2f
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.git.commit
+@@ -0,0 +1 @@
++59980f519aec8e14cae91f2eb07079a3d206329f
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.git.repoURL b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.git.repoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.git.repoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.name b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.name
+new file mode 100644
+index 0000000..17f423f
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.name
+@@ -0,0 +1 @@
++file:///Users/ruilu/udacity_repo#exercise-3
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.type b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.type
+new file mode 100644
+index 0000000..53f9167
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.source.type
+@@ -0,0 +1 @@
++PROJECT
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.user b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.user
+new file mode 100644
+index 0000000..80a46ff
+--- /dev/null
++++ b/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/tags/mlflow.user
+@@ -0,0 +1 @@
++ruilu
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/meta.yaml b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/meta.yaml
+new file mode 100644
+index 0000000..6f965ac
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/meta.yaml
+@@ -0,0 +1,15 @@
++artifact_uri: file:///Users/ruilu/udacity_repo/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/artifacts
++end_time: null
++entry_point_name: ''
++experiment_id: '0'
++lifecycle_stage: active
++name: ''
++run_id: 819109262fae4bad95be984718ec40ff
++run_uuid: 819109262fae4bad95be984718ec40ff
++source_name: ''
++source_type: 4
++source_version: ''
++start_time: 1705450438722
++status: 1
++tags: []
++user_id: ruilu
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/artifact_description b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/artifact_description
+new file mode 100644
+index 0000000..c02ab21
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/artifact_description
+@@ -0,0 +1 @@
++'Input data'
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/artifact_name b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/artifact_name
+new file mode 100644
+index 0000000..f86308f
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/artifact_name
+@@ -0,0 +1 @@
++iris.csv
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/artifact_type b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/artifact_type
+new file mode 100644
+index 0000000..33abe20
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/artifact_type
+@@ -0,0 +1 @@
++raw_data
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/file_url b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/file_url
+new file mode 100644
+index 0000000..12a7722
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/params/file_url
+@@ -0,0 +1 @@
++https://raw.githubusercontent.com/scikit-learn/scikit-learn/4dfdfb4e1bb3719628753a4ece995a1b2fa5312a/sklearn/datasets/data/iris.csv
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.gitRepoURL b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.gitRepoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.gitRepoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.project.entryPoint b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.project.entryPoint
+new file mode 100644
+index 0000000..88d050b
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.project.entryPoint
+@@ -0,0 +1 @@
++main
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.project.env b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.project.env
+new file mode 100644
+index 0000000..f79e4cb
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.project.env
+@@ -0,0 +1 @@
++conda
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.git.commit b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.git.commit
+new file mode 100644
+index 0000000..cbc1b2f
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.git.commit
+@@ -0,0 +1 @@
++59980f519aec8e14cae91f2eb07079a3d206329f
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.git.repoURL b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.git.repoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.git.repoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.name b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.name
+new file mode 100644
+index 0000000..b89a234
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.name
+@@ -0,0 +1 @@
++file:///Users/ruilu/udacity_repo#exercise-3/download_data
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.type b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.type
+new file mode 100644
+index 0000000..53f9167
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.source.type
+@@ -0,0 +1 @@
++PROJECT
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.user b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.user
+new file mode 100644
+index 0000000..80a46ff
+--- /dev/null
++++ b/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/tags/mlflow.user
+@@ -0,0 +1 @@
++ruilu
+\ No newline at end of file
+diff --git a/exercise-3/mlruns/0/meta.yaml b/exercise-3/mlruns/0/meta.yaml
+new file mode 100644
+index 0000000..184287a
+--- /dev/null
++++ b/exercise-3/mlruns/0/meta.yaml
+@@ -0,0 +1,6 @@
++artifact_location: file:///Users/ruilu/udacity_repo/exercise-3/mlruns/0
++creation_time: 1705284866012
++experiment_id: '0'
++last_update_time: 1705284866012
++lifecycle_stage: active
++name: Default
+diff --git a/exercise-3/outputs/2024-01-16/19-13-58/.hydra/config.yaml b/exercise-3/outputs/2024-01-16/19-13-58/.hydra/config.yaml
+new file mode 100644
+index 0000000..673f863
+--- /dev/null
++++ b/exercise-3/outputs/2024-01-16/19-13-58/.hydra/config.yaml
+@@ -0,0 +1,5 @@
++main:
++  project_name: experiment_3
++  experiment_name: dev
++data:
++  file_url: https://raw.githubusercontent.com/scikit-learn/scikit-learn/4dfdfb4e1bb3719628753a4ece995a1b2fa5312a/sklearn/datasets/data/iris.csv
+diff --git a/exercise-3/outputs/2024-01-16/19-13-58/.hydra/hydra.yaml b/exercise-3/outputs/2024-01-16/19-13-58/.hydra/hydra.yaml
+new file mode 100644
+index 0000000..d608841
+--- /dev/null
++++ b/exercise-3/outputs/2024-01-16/19-13-58/.hydra/hydra.yaml
+@@ -0,0 +1,125 @@
++hydra:
++  run:
++    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
++  sweep:
++    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
++    subdir: ${hydra.job.num}
++  hydra_logging:
++    version: 1
++    formatters:
++      simple:
++        format: '[%(asctime)s][HYDRA] %(message)s'
++    handlers:
++      console:
++        class: logging.StreamHandler
++        formatter: simple
++        stream: ext://sys.stdout
++    root:
++      level: INFO
++      handlers:
++      - console
++    loggers:
++      logging_example:
++        level: DEBUG
++    disable_existing_loggers: false
++  job_logging:
++    version: 1
++    formatters:
++      simple:
++        format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
++    handlers:
++      console:
++        class: logging.StreamHandler
++        formatter: simple
++        stream: ext://sys.stdout
++      file:
++        class: logging.FileHandler
++        formatter: simple
++        filename: ${hydra.job.name}.log
++    root:
++      level: INFO
++      handlers:
++      - console
++      - file
++    disable_existing_loggers: false
++  sweeper:
++    _target_: hydra._internal.core_plugins.basic_sweeper.BasicSweeper
++    max_batch_size: null
++  launcher:
++    _target_: hydra._internal.core_plugins.basic_launcher.BasicLauncher
++  help:
++    app_name: ${hydra.job.name}
++    header: '${hydra.help.app_name} is powered by Hydra.
++
++      '
++    footer: 'Powered by Hydra (https://hydra.cc)
++
++      Use --hydra-help to view Hydra specific help
++
++      '
++    template: '${hydra.help.header}
++
++      == Configuration groups ==
++
++      Compose your configuration from those groups (group=option)
++
++
++      $APP_CONFIG_GROUPS
++
++
++      == Config ==
++
++      Override anything in the config (foo.bar=value)
++
++
++      $CONFIG
++
++
++      ${hydra.help.footer}
++
++      '
++  hydra_help:
++    hydra_help: ???
++    template: 'Hydra (${hydra.runtime.version})
++
++      See https://hydra.cc for more info.
++
++
++      == Flags ==
++
++      $FLAGS_HELP
++
++
++      == Configuration groups ==
++
++      Compose your configuration from those groups (For example, append hydra/job_logging=disabled
++      to command line)
++
++
++      $HYDRA_CONFIG_GROUPS
++
++
++      Use ''--cfg hydra'' to Show the Hydra config.
++
++      '
++  output_subdir: .hydra
++  overrides:
++    hydra: []
++    task: []
++  job:
++    name: main
++    override_dirname: ''
++    id: ???
++    num: ???
++    config_name: config
++    env_set: {}
++    env_copy: []
++    config:
++      override_dirname:
++        kv_sep: '='
++        item_sep: ','
++        exclude_keys: []
++  runtime:
++    version: 1.0.6
++    cwd: /Users/ruilu/udacity_repo/exercise-3
++  verbose: false
+diff --git a/exercise-3/outputs/2024-01-16/19-13-58/.hydra/overrides.yaml b/exercise-3/outputs/2024-01-16/19-13-58/.hydra/overrides.yaml
+new file mode 100644
+index 0000000..fe51488
+--- /dev/null
++++ b/exercise-3/outputs/2024-01-16/19-13-58/.hydra/overrides.yaml
+@@ -0,0 +1 @@
++[]
+diff --git a/exercise_3/conda.yml b/exercise-3/outputs/2024-01-16/19-13-58/main.log
+similarity index 100%
+rename from exercise_3/conda.yml
+rename to exercise-3/outputs/2024-01-16/19-13-58/main.log
+diff --git a/exercise-3/process_data/MLproject b/exercise-3/process_data/MLproject
+new file mode 100644
+index 0000000..f45f2a9
+--- /dev/null
++++ b/exercise-3/process_data/MLproject
+@@ -0,0 +1,25 @@
++name: download_data
++conda_env: conda.yml
++
++entry_points:
++  main:
++    parameters:
++      input_artifact:
++        description: Fully-qualified artifact name for the input artifact
++        type: uri
++      artifact_name:
++        description: Name for the W&B artifact that will be created
++        type: str
++      artifact_type:
++        description: Type of the artifact to create
++        type: str
++        default: raw_data
++      artifact_description:
++        description: Description for the artifact
++        type: str
++
++    command: >-
++      python run.py --input_artifact {input_artifact} \
++                    --artifact_name {artifact_name} \
++                    --artifact_type {artifact_type} \
++                    --artifact_description {artifact_description}
+diff --git a/exercise-3/process_data/conda.yml b/exercise-3/process_data/conda.yml
+new file mode 100644
+index 0000000..09811f0
+--- /dev/null
++++ b/exercise-3/process_data/conda.yml
+@@ -0,0 +1,14 @@
++name: download_data
++channels:
++  - conda-forge
++  - defaults
++dependencies:
++  - requests=2.24.0
++  - pip=20.3.3
++  - seaborn=0.11.1
++  - pandas=1.2.3
++  - scikit-learn=0.24.1
++  - matplotlib==3.2.2
++  - pillow=8.1.2
++  - pip:
++      - wandb==0.10.21
+\ No newline at end of file
+diff --git a/exercise-3/process_data/run.py b/exercise-3/process_data/run.py
+new file mode 100644
+index 0000000..c7ad9da
+--- /dev/null
++++ b/exercise-3/process_data/run.py
+@@ -0,0 +1,88 @@
++#!/usr/bin/env python
++import argparse
++import logging
++import seaborn as sns
++import pandas as pd
++import wandb
++
++from sklearn.manifold import TSNE
++
++logging.basicConfig(level=logging.INFO, format="%(asctime)-15s %(message)s")
++logger = logging.getLogger()
++
++
++def go(args):
++
++    run = wandb.init(job_type="process_data")
++
++    logger.info("Downloading artifact")
++    artifact = run.use_artifact(args.input_artifact)
++    artifact_path = artifact.file()
++
++    iris = pd.read_csv(
++        artifact_path,
++        skiprows=1,
++        names=("sepal_length", "sepal_width", "petal_length", "petal_width", "target"),
++    )
++
++    target_names = "setosa,versicolor,virginica".split(",")
++    iris["target"] = [target_names[k] for k in iris["target"]]
++
++    logger.info("Performing t-SNE")
++    tsne = TSNE(n_components=2, init="pca", random_state=0)
++    transf = tsne.fit_transform(iris.iloc[:, :4])
++
++    iris["tsne_1"] = transf[:, 0]
++    iris["tsne_2"] = transf[:, 1]
++
++    g = sns.displot(iris, x="tsne_1", y="tsne_2", hue="target", kind="kde")
++
++    logger.info("Uploading image to W&B")
++    run.log({"t-SNE": wandb.Image(g.fig)})
++
++    logger.info("Creating artifact")
++
++    iris.to_csv("clean_data.csv")
++
++    artifact = wandb.Artifact(
++        name=args.artifact_name,
++        type=args.artifact_type,
++        description=args.artifact_description,
++    )
++    artifact.add_file("clean_data.csv")
++
++    logger.info("Logging artifact")
++    run.log_artifact(artifact)
++
++
++if __name__ == "__main__":
++    parser = argparse.ArgumentParser(
++        description="Download a file and upload it as an artifact to W&B",
++        fromfile_prefix_chars="@",
++    )
++
++    parser.add_argument(
++        "--input_artifact",
++        type=str,
++        help="Fully-qualified name for the input artifact",
++        required=True,
++    )
++
++    parser.add_argument(
++        "--artifact_name", type=str, help="Name for the artifact", required=True
++    )
++
++    parser.add_argument(
++        "--artifact_type", type=str, help="Type for the artifact", required=True
++    )
++
++    parser.add_argument(
++        "--artifact_description",
++        type=str,
++        help="Description for the artifact",
++        required=True,
++    )
++
++    args = parser.parse_args()
++
++    go(args)
+diff --git a/exercise-4/MLproject b/exercise-4/MLproject
+new file mode 100644
+index 0000000..71bbf66
+--- /dev/null
++++ b/exercise-4/MLproject
+@@ -0,0 +1,7 @@
++name: download_data
++conda_env: conda.yml
++
++entry_points:
++  main:
++    command: >-
++      jupyter notebook
+\ No newline at end of file
+diff --git a/exercise-4/conda.yml b/exercise-4/conda.yml
+new file mode 100644
+index 0000000..b211b8d
+--- /dev/null
++++ b/exercise-4/conda.yml
+@@ -0,0 +1,13 @@
++name: download_data
++channels:
++  - conda-forge
++  - defaults
++dependencies:
++  - jupyterlab=3.0.12
++  - seaborn=0.11.1
++  - pandas=1.2.3
++  - pip=20.3.3
++  - pandas-profiling=2.11.0
++  - pyarrow=2.0
++  - pip:
++      - wandb==0.10.21
+diff --git a/exercise-4/genres_mod.parquet b/exercise-4/genres_mod.parquet
+new file mode 100644
+index 0000000..fa8ff55
+Binary files /dev/null and b/exercise-4/genres_mod.parquet differ
+diff --git a/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/meta.yaml b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/meta.yaml
+new file mode 100644
+index 0000000..35b1dbd
+--- /dev/null
++++ b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/meta.yaml
+@@ -0,0 +1,15 @@
++artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/artifacts
++end_time: null
++entry_point_name: ''
++experiment_id: '0'
++lifecycle_stage: active
++run_id: 25c0d3f7dca8407b92eb3838619a64fb
++run_name: enthused-bee-660
++run_uuid: 25c0d3f7dca8407b92eb3838619a64fb
++source_name: ''
++source_type: 4
++source_version: ''
++start_time: 1705453142559
++status: 1
++tags: []
++user_id: ruilu
+diff --git a/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.gitRepoURL b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.gitRepoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.gitRepoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.project.entryPoint b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.project.entryPoint
+new file mode 100644
+index 0000000..88d050b
+--- /dev/null
++++ b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.project.entryPoint
+@@ -0,0 +1 @@
++main
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.project.env b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.project.env
+new file mode 100644
+index 0000000..f79e4cb
+--- /dev/null
++++ b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.project.env
+@@ -0,0 +1 @@
++conda
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.runName b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.runName
+new file mode 100644
+index 0000000..4866483
+--- /dev/null
++++ b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.runName
+@@ -0,0 +1 @@
++enthused-bee-660
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.git.commit b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.git.commit
+new file mode 100644
+index 0000000..cbc1b2f
+--- /dev/null
++++ b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.git.commit
+@@ -0,0 +1 @@
++59980f519aec8e14cae91f2eb07079a3d206329f
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.git.repoURL b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.git.repoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.git.repoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.name b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.name
+new file mode 100644
+index 0000000..5236988
+--- /dev/null
++++ b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.name
+@@ -0,0 +1 @@
++file:///Users/ruilu/udacity_repo#exercise-4
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.type b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.type
+new file mode 100644
+index 0000000..53f9167
+--- /dev/null
++++ b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.source.type
+@@ -0,0 +1 @@
++PROJECT
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.user b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.user
+new file mode 100644
+index 0000000..80a46ff
+--- /dev/null
++++ b/exercise-4/mlruns/0/25c0d3f7dca8407b92eb3838619a64fb/tags/mlflow.user
+@@ -0,0 +1 @@
++ruilu
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/meta.yaml b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/meta.yaml
+new file mode 100644
+index 0000000..5617b9d
+--- /dev/null
++++ b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/meta.yaml
+@@ -0,0 +1,15 @@
++artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/artifacts
++end_time: null
++entry_point_name: ''
++experiment_id: '0'
++lifecycle_stage: active
++run_id: 9620f9af4bb24b12bd9d5584b6917884
++run_name: fortunate-bird-613
++run_uuid: 9620f9af4bb24b12bd9d5584b6917884
++source_name: ''
++source_type: 4
++source_version: ''
++start_time: 1705454331450
++status: 1
++tags: []
++user_id: ruilu
+diff --git a/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.gitRepoURL b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.gitRepoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.gitRepoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.project.entryPoint b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.project.entryPoint
+new file mode 100644
+index 0000000..88d050b
+--- /dev/null
++++ b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.project.entryPoint
+@@ -0,0 +1 @@
++main
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.project.env b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.project.env
+new file mode 100644
+index 0000000..f79e4cb
+--- /dev/null
++++ b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.project.env
+@@ -0,0 +1 @@
++conda
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.runName b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.runName
+new file mode 100644
+index 0000000..72cbf92
+--- /dev/null
++++ b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.runName
+@@ -0,0 +1 @@
++fortunate-bird-613
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.git.commit b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.git.commit
+new file mode 100644
+index 0000000..cbc1b2f
+--- /dev/null
++++ b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.git.commit
+@@ -0,0 +1 @@
++59980f519aec8e14cae91f2eb07079a3d206329f
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.git.repoURL b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.git.repoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.git.repoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.name b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.name
+new file mode 100644
+index 0000000..5236988
+--- /dev/null
++++ b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.name
+@@ -0,0 +1 @@
++file:///Users/ruilu/udacity_repo#exercise-4
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.type b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.type
+new file mode 100644
+index 0000000..53f9167
+--- /dev/null
++++ b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.source.type
+@@ -0,0 +1 @@
++PROJECT
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.user b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.user
+new file mode 100644
+index 0000000..80a46ff
+--- /dev/null
++++ b/exercise-4/mlruns/0/9620f9af4bb24b12bd9d5584b6917884/tags/mlflow.user
+@@ -0,0 +1 @@
++ruilu
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/meta.yaml b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/meta.yaml
+new file mode 100644
+index 0000000..1433f65
+--- /dev/null
++++ b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/meta.yaml
+@@ -0,0 +1,15 @@
++artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/artifacts
++end_time: 1705455875176
++entry_point_name: ''
++experiment_id: '0'
++lifecycle_stage: active
++run_id: a88b2cfd62d241589700bdb0aafaa25c
++run_name: exultant-sloth-353
++run_uuid: a88b2cfd62d241589700bdb0aafaa25c
++source_name: ''
++source_type: 4
++source_version: ''
++start_time: 1705455656525
++status: 4
++tags: []
++user_id: ruilu
+diff --git a/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.gitRepoURL b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.gitRepoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.gitRepoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.project.entryPoint b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.project.entryPoint
+new file mode 100644
+index 0000000..88d050b
+--- /dev/null
++++ b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.project.entryPoint
+@@ -0,0 +1 @@
++main
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.project.env b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.project.env
+new file mode 100644
+index 0000000..f79e4cb
+--- /dev/null
++++ b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.project.env
+@@ -0,0 +1 @@
++conda
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.runName b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.runName
+new file mode 100644
+index 0000000..fdc4559
+--- /dev/null
++++ b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.runName
+@@ -0,0 +1 @@
++exultant-sloth-353
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.git.commit b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.git.commit
+new file mode 100644
+index 0000000..cbc1b2f
+--- /dev/null
++++ b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.git.commit
+@@ -0,0 +1 @@
++59980f519aec8e14cae91f2eb07079a3d206329f
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.git.repoURL b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.git.repoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.git.repoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.name b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.name
+new file mode 100644
+index 0000000..5236988
+--- /dev/null
++++ b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.name
+@@ -0,0 +1 @@
++file:///Users/ruilu/udacity_repo#exercise-4
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.type b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.type
+new file mode 100644
+index 0000000..53f9167
+--- /dev/null
++++ b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.source.type
+@@ -0,0 +1 @@
++PROJECT
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.user b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.user
+new file mode 100644
+index 0000000..80a46ff
+--- /dev/null
++++ b/exercise-4/mlruns/0/a88b2cfd62d241589700bdb0aafaa25c/tags/mlflow.user
+@@ -0,0 +1 @@
++ruilu
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/meta.yaml b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/meta.yaml
+new file mode 100644
+index 0000000..e2b4da4
+--- /dev/null
++++ b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/meta.yaml
+@@ -0,0 +1,15 @@
++artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/artifacts
++end_time: null
++entry_point_name: ''
++experiment_id: '0'
++lifecycle_stage: active
++run_id: c2e1a17a123440d29caa200bea20eac8
++run_name: mercurial-goat-434
++run_uuid: c2e1a17a123440d29caa200bea20eac8
++source_name: ''
++source_type: 4
++source_version: ''
++start_time: 1705454176132
++status: 1
++tags: []
++user_id: ruilu
+diff --git a/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.gitRepoURL b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.gitRepoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.gitRepoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.project.entryPoint b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.project.entryPoint
+new file mode 100644
+index 0000000..88d050b
+--- /dev/null
++++ b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.project.entryPoint
+@@ -0,0 +1 @@
++main
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.project.env b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.project.env
+new file mode 100644
+index 0000000..f79e4cb
+--- /dev/null
++++ b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.project.env
+@@ -0,0 +1 @@
++conda
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.runName b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.runName
+new file mode 100644
+index 0000000..c504413
+--- /dev/null
++++ b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.runName
+@@ -0,0 +1 @@
++mercurial-goat-434
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.git.commit b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.git.commit
+new file mode 100644
+index 0000000..cbc1b2f
+--- /dev/null
++++ b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.git.commit
+@@ -0,0 +1 @@
++59980f519aec8e14cae91f2eb07079a3d206329f
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.git.repoURL b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.git.repoURL
+new file mode 100644
+index 0000000..4fd5e85
+--- /dev/null
++++ b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.git.repoURL
+@@ -0,0 +1 @@
++https://github.com/lurui87/udacity_repo.git
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.name b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.name
+new file mode 100644
+index 0000000..5236988
+--- /dev/null
++++ b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.name
+@@ -0,0 +1 @@
++file:///Users/ruilu/udacity_repo#exercise-4
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.type b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.type
+new file mode 100644
+index 0000000..53f9167
+--- /dev/null
++++ b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.source.type
+@@ -0,0 +1 @@
++PROJECT
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.user b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.user
+new file mode 100644
+index 0000000..80a46ff
+--- /dev/null
++++ b/exercise-4/mlruns/0/c2e1a17a123440d29caa200bea20eac8/tags/mlflow.user
+@@ -0,0 +1 @@
++ruilu
+\ No newline at end of file
+diff --git a/exercise-4/mlruns/0/meta.yaml b/exercise-4/mlruns/0/meta.yaml
+new file mode 100644
+index 0000000..8226c70
+--- /dev/null
++++ b/exercise-4/mlruns/0/meta.yaml
+@@ -0,0 +1,6 @@
++artifact_location: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0
++creation_time: 1705453142558
++experiment_id: '0'
++last_update_time: 1705453142558
++lifecycle_stage: active
++name: Default
+diff --git a/exercise-4/wandb/debug-cli.ruilu.log b/exercise-4/wandb/debug-cli.ruilu.log
+new file mode 100644
+index 0000000..e69de29
+diff --git a/exercise-4/wandb/debug-internal.log b/exercise-4/wandb/debug-internal.log
+new file mode 120000
+index 0000000..a1042fa
+--- /dev/null
++++ b/exercise-4/wandb/debug-internal.log
+@@ -0,0 +1 @@
++run-20240116_210022-fbdkwqcz/logs/debug-internal.log
+\ No newline at end of file
+diff --git a/exercise-4/wandb/debug.log b/exercise-4/wandb/debug.log
+new file mode 120000
+index 0000000..84a1e84
+--- /dev/null
++++ b/exercise-4/wandb/debug.log
+@@ -0,0 +1 @@
++run-20240116_210022-fbdkwqcz/logs/debug.log
+\ No newline at end of file
+diff --git a/exercise-4/wandb/latest-run b/exercise-4/wandb/latest-run
+new file mode 120000
+index 0000000..afa7062
+--- /dev/null
++++ b/exercise-4/wandb/latest-run
+@@ -0,0 +1 @@
++run-20240116_210022-fbdkwqcz
+\ No newline at end of file
+diff --git a/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/conda-environment.yaml b/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/conda-environment.yaml
+new file mode 100644
+index 0000000..7e98459
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/conda-environment.yaml
+@@ -0,0 +1,530 @@
++name: base
++channels:
++  - defaults
++dependencies:
++  - _anaconda_depends=2023.09=py311_openblas_1
++  - abseil-cpp=20211102.0=he9d5cce_0
++  - aiobotocore=2.5.0=py311hecd8cb5_0
++  - aiofiles=22.1.0=py311hecd8cb5_0
++  - aiohttp=3.8.5=py311h6c40b1e_0
++  - aioitertools=0.7.1=pyhd3eb1b0_0
++  - aiosignal=1.2.0=pyhd3eb1b0_0
++  - aiosqlite=0.18.0=py311hecd8cb5_0
++  - alabaster=0.7.12=pyhd3eb1b0_0
++  - anaconda-anon-usage=0.4.2=py311hfb7c958_0
++  - anaconda-catalogs=0.2.0=py311hecd8cb5_0
++  - anaconda-client=1.12.1=py311hecd8cb5_0
++  - anaconda-cloud-auth=0.1.3=py311hecd8cb5_0
++  - anaconda-navigator=2.5.0=py311hecd8cb5_0
++  - anaconda-project=0.11.1=py311hecd8cb5_0
++  - anyio=3.5.0=py311hecd8cb5_0
++  - aom=3.6.0=hcec6c5f_0
++  - appdirs=1.4.4=pyhd3eb1b0_0
++  - applaunchservices=0.3.0=py311hecd8cb5_0
++  - appnope=0.1.2=py311hecd8cb5_1001
++  - appscript=1.1.2=py311h6c40b1e_0
++  - argon2-cffi=21.3.0=pyhd3eb1b0_0
++  - argon2-cffi-bindings=21.2.0=py311h6c40b1e_0
++  - arrow=1.2.3=py311hecd8cb5_1
++  - arrow-cpp=11.0.0=h89a8245_2
++  - astroid=2.14.2=py311hecd8cb5_0
++  - astropy=5.1=py311hb9e55a9_0
++  - asttokens=2.0.5=pyhd3eb1b0_0
++  - async-timeout=4.0.2=py311hecd8cb5_0
++  - atomicwrites=1.4.0=py_0
++  - attrs=22.1.0=py311hecd8cb5_0
++  - automat=20.2.0=py_0
++  - autopep8=1.6.0=pyhd3eb1b0_1
++  - aws-c-common=0.6.8=h6c40b1e_1
++  - aws-c-event-stream=0.1.6=hcec6c5f_6
++  - aws-checksums=0.1.11=h6c40b1e_2
++  - aws-sdk-cpp=1.8.185=h1a8d504_1
++  - babel=2.11.0=py311hecd8cb5_0
++  - backcall=0.2.0=pyhd3eb1b0_0
++  - backports=1.1=pyhd3eb1b0_0
++  - backports.functools_lru_cache=1.6.4=pyhd3eb1b0_0
++  - backports.tempfile=1.0=pyhd3eb1b0_1
++  - backports.weakref=1.0.post1=py_1
++  - bcrypt=3.2.0=py311h6c40b1e_1
++  - beautifulsoup4=4.12.2=py311hecd8cb5_0
++  - binaryornot=0.4.4=pyhd3eb1b0_1
++  - black=23.3.0=py311hecd8cb5_0
++  - blas=1.0=openblas
++  - bleach=4.1.0=pyhd3eb1b0_0
++  - blosc=1.21.3=hcec6c5f_0
++  - bokeh=3.2.1=py311h85bffb1_0
++  - boltons=23.0.0=py311hecd8cb5_0
++  - boost-cpp=1.73.0=hca72f7f_12
++  - botocore=1.29.76=py311hecd8cb5_0
++  - bottleneck=1.3.5=py311hb9e55a9_0
++  - brotli=1.0.9=hca72f7f_7
++  - brotli-bin=1.0.9=hca72f7f_7
++  - brotlipy=0.7.0=py311h6c40b1e_1002
++  - brunsli=0.1=h23ab428_0
++  - bzip2=1.0.8=h1de35cc_0
++  - c-ares=1.19.1=h6c40b1e_0
++  - c-blosc2=2.8.0=hcec6c5f_0
++  - ca-certificates=2023.08.22=hecd8cb5_0
++  - cctools=949.0.1=h9abeeb2_25
++  - cctools_osx-64=949.0.1=hc7db93f_25
++  - certifi=2023.7.22=py311hecd8cb5_0
++  - cffi=1.15.1=py311h6c40b1e_3
++  - cfitsio=3.470=hbd21bf8_7
++  - chardet=4.0.0=py311hecd8cb5_1003
++  - charls=2.2.0=h23ab428_0
++  - charset-normalizer=2.0.4=pyhd3eb1b0_0
++  - click=8.0.4=py311hecd8cb5_0
++  - cloudpickle=2.2.1=py311hecd8cb5_0
++  - clyent=1.2.2=py311hecd8cb5_1
++  - colorama=0.4.6=py311hecd8cb5_0
++  - colorcet=3.0.1=py311hecd8cb5_0
++  - comm=0.1.2=py311hecd8cb5_0
++  - conda=23.7.4=py311hecd8cb5_0
++  - conda-build=3.26.1=py311hecd8cb5_0
++  - conda-content-trust=0.2.0=py311hecd8cb5_0
++  - conda-index=0.3.0=py311hecd8cb5_0
++  - conda-libmamba-solver=23.7.0=py311hecd8cb5_0
++  - conda-pack=0.6.0=pyhd3eb1b0_0
++  - conda-package-handling=2.2.0=py311hecd8cb5_0
++  - conda-package-streaming=0.9.0=py311hecd8cb5_0
++  - conda-repo-cli=1.0.75=py311hecd8cb5_0
++  - conda-token=0.4.0=pyhd3eb1b0_0
++  - conda-verify=3.4.2=py_1
++  - constantly=15.1.0=py311hecd8cb5_0
++  - contourpy=1.0.5=py311ha357a0b_0
++  - cookiecutter=1.7.3=pyhd3eb1b0_0
++  - cryptography=41.0.3=py311h30e54ef_0
++  - cssselect=1.1.0=pyhd3eb1b0_0
++  - curl=8.2.1=h04015c4_0
++  - cycler=0.11.0=pyhd3eb1b0_0
++  - cyrus-sasl=2.1.28=h3973f50_1
++  - cytoolz=0.12.0=py311h6c40b1e_0
++  - dask=2023.6.0=py311hecd8cb5_0
++  - dask-core=2023.6.0=py311hecd8cb5_0
++  - datasets=2.12.0=py311hecd8cb5_0
++  - datashader=0.15.2=py311hecd8cb5_0
++  - datashape=0.5.4=py311hecd8cb5_1
++  - dav1d=1.2.1=h6c40b1e_0
++  - debugpy=1.6.7=py311hcec6c5f_0
++  - decorator=5.1.1=pyhd3eb1b0_0
++  - defusedxml=0.7.1=pyhd3eb1b0_0
++  - diff-match-patch=20200713=pyhd3eb1b0_0
++  - dill=0.3.6=py311hecd8cb5_0
++  - distributed=2023.6.0=py311hecd8cb5_0
++  - docstring-to-markdown=0.11=py311hecd8cb5_0
++  - docutils=0.18.1=py311hecd8cb5_3
++  - entrypoints=0.4=py311hecd8cb5_0
++  - et_xmlfile=1.1.0=py311hecd8cb5_0
++  - executing=0.8.3=pyhd3eb1b0_0
++  - flake8=6.0.0=py311hecd8cb5_0
++  - flask=2.2.2=py311hecd8cb5_0
++  - fmt=9.1.0=ha357a0b_0
++  - fonttools=4.25.0=pyhd3eb1b0_0
++  - freetype=2.12.1=hd8bbffd_0
++  - frozenlist=1.3.3=py311h6c40b1e_0
++  - fsspec=2023.4.0=py311hecd8cb5_0
++  - future=0.18.3=py311hecd8cb5_0
++  - gensim=4.3.0=py311hc5848a5_0
++  - gettext=0.21.0=he85b6c0_1
++  - gflags=2.2.2=h0a44026_0
++  - giflib=5.2.1=h6c40b1e_3
++  - glib=2.69.1=hfff2838_2
++  - glob2=0.7=pyhd3eb1b0_0
++  - glog=0.5.0=h23ab428_0
++  - gmp=6.2.1=he9d5cce_3
++  - gmpy2=2.1.2=py311h1c2e9e1_0
++  - greenlet=2.0.1=py311hcec6c5f_0
++  - grpc-cpp=1.48.2=h4ed1731_1
++  - gst-plugins-base=1.14.1=hcec6c5f_1
++  - gstreamer=1.14.1=h6c40b1e_1
++  - h5py=3.9.0=py311hdb7e403_0
++  - hdf5=1.12.1=ha01d115_3
++  - heapdict=1.0.1=pyhd3eb1b0_0
++  - holoviews=1.17.1=py311hecd8cb5_0
++  - huggingface_hub=0.15.1=py311hecd8cb5_0
++  - hvplot=0.8.4=py311hecd8cb5_0
++  - hyperlink=21.0.0=pyhd3eb1b0_0
++  - icu=58.2=h0a44026_3
++  - idna=3.4=py311hecd8cb5_0
++  - imagecodecs=2023.1.23=py311h89890a9_0
++  - imageio=2.31.1=py311hecd8cb5_0
++  - imagesize=1.4.1=py311hecd8cb5_0
++  - imbalanced-learn=0.10.1=py311hecd8cb5_1
++  - importlib-metadata=6.0.0=py311hecd8cb5_0
++  - importlib_metadata=6.0.0=hd3eb1b0_0
++  - incremental=21.3.0=pyhd3eb1b0_0
++  - inflection=0.5.1=py311hecd8cb5_0
++  - iniconfig=1.1.1=pyhd3eb1b0_0
++  - intake=0.6.8=py311hecd8cb5_0
++  - intervaltree=3.1.0=pyhd3eb1b0_0
++  - ipykernel=6.25.0=py311h85bffb1_0
++  - ipython=8.15.0=py311hecd8cb5_0
++  - ipython_genutils=0.2.0=pyhd3eb1b0_1
++  - ipywidgets=8.0.4=py311hecd8cb5_0
++  - isort=5.9.3=pyhd3eb1b0_0
++  - itemadapter=0.3.0=pyhd3eb1b0_0
++  - itemloaders=1.0.4=pyhd3eb1b0_1
++  - itsdangerous=2.0.1=pyhd3eb1b0_0
++  - jaraco.classes=3.2.1=pyhd3eb1b0_0
++  - jedi=0.18.1=py311hecd8cb5_1
++  - jellyfish=1.0.1=py311haa3eb71_0
++  - jinja2=3.1.2=py311hecd8cb5_0
++  - jinja2-time=0.2.0=pyhd3eb1b0_3
++  - jmespath=0.10.0=pyhd3eb1b0_0
++  - joblib=1.2.0=py311hecd8cb5_0
++  - jpeg=9e=h6c40b1e_1
++  - jq=1.6=h9ed2024_1000
++  - json5=0.9.6=pyhd3eb1b0_0
++  - jsonpatch=1.32=pyhd3eb1b0_0
++  - jsonpointer=2.1=pyhd3eb1b0_0
++  - jsonschema=4.17.3=py311hecd8cb5_0
++  - jupyter=1.0.0=py311hecd8cb5_8
++  - jupyter_client=7.4.9=py311hecd8cb5_0
++  - jupyter_console=6.6.3=py311hecd8cb5_0
++  - jupyter_core=5.3.0=py311hecd8cb5_0
++  - jupyter_events=0.6.3=py311hecd8cb5_0
++  - jupyter_server=1.23.4=py311hecd8cb5_0
++  - jupyter_server_fileid=0.9.0=py311hecd8cb5_0
++  - jupyter_server_ydoc=0.8.0=py311hecd8cb5_1
++  - jupyter_ydoc=0.2.4=py311hecd8cb5_0
++  - jupyterlab=3.6.3=py311hecd8cb5_0
++  - jupyterlab_pygments=0.1.2=py_0
++  - jupyterlab_server=2.22.0=py311hecd8cb5_0
++  - jupyterlab_widgets=3.0.5=py311hecd8cb5_0
++  - jxrlib=1.1=haf1e3a3_2
++  - kaleido-core=0.2.1=hb664fd8_0
++  - keyring=23.13.1=py311hecd8cb5_0
++  - kiwisolver=1.4.4=py311hcec6c5f_0
++  - krb5=1.20.1=h428f121_1
++  - lazy-object-proxy=1.6.0=py311h6c40b1e_0
++  - lazy_loader=0.2=py311hecd8cb5_0
++  - lcms2=2.12=hf1fd2bf_0
++  - ld64=530=h20443b4_25
++  - ld64_osx-64=530=h70f3046_25
++  - ldid=2.1.5=hc58f1be_3
++  - lerc=3.0=he9d5cce_0
++  - libaec=1.0.4=hb1e8313_1
++  - libarchive=3.6.2=h29ab7a1_2
++  - libavif=0.11.1=h6c40b1e_0
++  - libboost=1.73.0=h3fa6bed_12
++  - libbrotlicommon=1.0.9=hca72f7f_7
++  - libbrotlidec=1.0.9=hca72f7f_7
++  - libbrotlienc=1.0.9=hca72f7f_7
++  - libclang=14.0.6=default_hd95374b_1
++  - libclang13=14.0.6=default_habbcc1a_1
++  - libcurl=8.2.1=hf20ceda_0
++  - libcxx=14.0.6=h9765a3e_0
++  - libdeflate=1.17=hb664fd8_0
++  - libedit=3.1.20221030=h6c40b1e_0
++  - libev=4.33=h9ed2024_1
++  - libevent=2.1.12=h04015c4_1
++  - libffi=3.4.4=hecd8cb5_0
++  - libgfortran=5.0.0=11_3_0_hecd8cb5_28
++  - libgfortran5=11.3.0=h9dfd629_28
++  - libiconv=1.16=hca72f7f_2
++  - liblief=0.12.3=hcec6c5f_0
++  - libllvm14=14.0.6=h91fad77_3
++  - libmamba=1.5.1=h63cd6dc_0
++  - libmambapy=1.5.1=py311h8c3233a_0
++  - libnghttp2=1.52.0=h9beae6a_1
++  - libopenblas=0.3.21=h54e7dc3_0
++  - libpng=1.6.39=h6c40b1e_0
++  - libpq=12.15=h04015c4_1
++  - libprotobuf=3.20.3=hfff2838_0
++  - libsodium=1.0.18=h1de35cc_0
++  - libsolv=0.7.24=hfff2838_0
++  - libspatialindex=1.9.3=h23ab428_0
++  - libssh2=1.10.0=h04015c4_2
++  - libthrift=0.15.0=h70b4b81_2
++  - libtiff=4.5.1=hcec6c5f_0
++  - libwebp=1.3.2=hf6ce154_0
++  - libwebp-base=1.3.2=h6c40b1e_0
++  - libxml2=2.10.4=h930c0e2_0
++  - libxslt=1.1.37=h6d1eb0e_0
++  - libzopfli=1.0.3=hb1e8313_0
++  - linkify-it-py=2.0.0=py311hecd8cb5_0
++  - llvm-openmp=14.0.6=h0dcd299_0
++  - llvmlite=0.40.0=py311hfff2838_0
++  - locket=1.0.0=py311hecd8cb5_0
++  - lxml=4.9.3=py311h946e0e5_0
++  - lz4=4.3.2=py311h6c40b1e_0
++  - lz4-c=1.9.4=hcec6c5f_0
++  - lzo=2.10=haf1e3a3_2
++  - markdown=3.4.1=py311hecd8cb5_0
++  - markdown-it-py=2.2.0=py311hecd8cb5_1
++  - markupsafe=2.1.1=py311h6c40b1e_0
++  - mathjax=2.7.5=hecd8cb5_0
++  - matplotlib=3.7.2=py311hecd8cb5_0
++  - matplotlib-base=3.7.2=py311h8251f7d_0
++  - matplotlib-inline=0.1.6=py311hecd8cb5_0
++  - mccabe=0.7.0=pyhd3eb1b0_0
++  - mdit-py-plugins=0.3.0=py311hecd8cb5_0
++  - mdurl=0.1.0=py311hecd8cb5_0
++  - mistune=0.8.4=py311h6c40b1e_1000
++  - more-itertools=8.12.0=pyhd3eb1b0_0
++  - mpc=1.1.0=h6ef4df4_1
++  - mpfr=4.0.2=h9066e36_1
++  - mpmath=1.3.0=py311hecd8cb5_0
++  - msgpack-python=1.0.3=py311ha357a0b_0
++  - multidict=6.0.2=py311h6c40b1e_0
++  - multipledispatch=0.6.0=py311hecd8cb5_0
++  - multiprocess=0.70.14=py311hecd8cb5_0
++  - munkres=1.1.4=py_0
++  - mypy_extensions=1.0.0=py311hecd8cb5_0
++  - mysql=5.7.24=h1a8d504_2
++  - navigator-updater=0.4.0=py311hecd8cb5_1
++  - nbclassic=0.5.5=py311hecd8cb5_0
++  - nbclient=0.5.13=py311hecd8cb5_0
++  - nbconvert=6.5.4=py311hecd8cb5_0
++  - nbformat=5.9.2=py311hecd8cb5_0
++  - ncurses=6.4=hcec6c5f_0
++  - nest-asyncio=1.5.6=py311hecd8cb5_0
++  - networkx=3.1=py311hecd8cb5_0
++  - nltk=3.8.1=py311hecd8cb5_0
++  - notebook=6.5.4=py311hecd8cb5_1
++  - notebook-shim=0.2.2=py311hecd8cb5_0
++  - numba=0.57.0=py311hdb55bb0_0
++  - numexpr=2.8.4=py311hd0e4f0d_1
++  - numpydoc=1.5.0=py311hecd8cb5_0
++  - oniguruma=6.9.7.1=h9ed2024_0
++  - openjpeg=2.4.0=h66ea3da_0
++  - openpyxl=3.0.10=py311h6c40b1e_0
++  - openssl=3.0.10=hca72f7f_2
++  - orc=1.7.4=h995b336_1
++  - packaging=23.1=py311hecd8cb5_0
++  - pandas=2.0.3=py311hdb55bb0_0
++  - pandocfilters=1.5.0=pyhd3eb1b0_0
++  - panel=1.2.3=py311hecd8cb5_0
++  - param=1.13.0=py311hecd8cb5_0
++  - parsel=1.6.0=py311hecd8cb5_0
++  - parso=0.8.3=pyhd3eb1b0_0
++  - partd=1.4.0=py311hecd8cb5_0
++  - patch=2.7.6=h1de35cc_1001
++  - pathlib=1.0.1=pyhd3eb1b0_1
++  - pathspec=0.10.3=py311hecd8cb5_0
++  - patsy=0.5.3=py311hecd8cb5_0
++  - pcre=8.45=h23ab428_0
++  - pcre2=10.42=h9b97e30_0
++  - pep8=1.7.1=py311hecd8cb5_1
++  - pexpect=4.8.0=pyhd3eb1b0_3
++  - pickleshare=0.7.5=pyhd3eb1b0_1003
++  - pillow=9.4.0=py311hcec6c5f_1
++  - pip=23.2.1=py311hecd8cb5_0
++  - pkce=1.0.3=py311hecd8cb5_0
++  - pkginfo=1.9.6=py311hecd8cb5_0
++  - platformdirs=3.10.0=py311hecd8cb5_0
++  - plotly=5.9.0=py311hecd8cb5_0
++  - pluggy=1.0.0=py311hecd8cb5_1
++  - ply=3.11=py311hecd8cb5_0
++  - poyo=0.5.0=pyhd3eb1b0_0
++  - prometheus_client=0.14.1=py311hecd8cb5_0
++  - prompt-toolkit=3.0.36=py311hecd8cb5_0
++  - prompt_toolkit=3.0.36=hd3eb1b0_0
++  - protego=0.1.16=py_0
++  - psutil=5.9.0=py311h6c40b1e_0
++  - ptyprocess=0.7.0=pyhd3eb1b0_2
++  - pure_eval=0.2.2=pyhd3eb1b0_0
++  - py-cpuinfo=8.0.0=pyhd3eb1b0_1
++  - py-lief=0.12.3=py311hcec6c5f_0
++  - pyarrow=11.0.0=py311hf41f4e6_1
++  - pyasn1=0.4.8=pyhd3eb1b0_0
++  - pyasn1-modules=0.2.8=py_0
++  - pybind11-abi=4=hd3eb1b0_1
++  - pycodestyle=2.10.0=py311hecd8cb5_0
++  - pycosat=0.6.4=py311h6c40b1e_0
++  - pycparser=2.21=pyhd3eb1b0_0
++  - pyct=0.5.0=py311hecd8cb5_0
++  - pycurl=7.45.2=py311h04015c4_1
++  - pydantic=1.10.8=py311h6c40b1e_0
++  - pydispatcher=2.0.5=py311hecd8cb5_2
++  - pydocstyle=6.3.0=py311hecd8cb5_0
++  - pyerfa=2.0.0=py311h6c40b1e_0
++  - pyflakes=3.0.1=py311hecd8cb5_0
++  - pygments=2.15.1=py311hecd8cb5_1
++  - pyjwt=2.4.0=py311hecd8cb5_0
++  - pylint=2.16.2=py311hecd8cb5_0
++  - pylint-venv=2.3.0=py311hecd8cb5_0
++  - pyls-spyder=0.4.0=pyhd3eb1b0_0
++  - pyobjc-core=9.0=py311h9205ec4_1
++  - pyobjc-framework-cocoa=9.0=py311h9205ec4_0
++  - pyobjc-framework-coreservices=9.0=py311h46256e1_0
++  - pyobjc-framework-fsevents=9.0=py311hecd8cb5_0
++  - pyodbc=4.0.34=py311hcec6c5f_0
++  - pyopenssl=23.2.0=py311hecd8cb5_0
++  - pyparsing=3.0.9=py311hecd8cb5_0
++  - pyqt=5.15.7=py311hcec6c5f_0
++  - pyqt5-sip=12.11.0=py311hcec6c5f_0
++  - pyqtwebengine=5.15.7=py311hcec6c5f_0
++  - pyrsistent=0.18.0=py311h6c40b1e_0
++  - pysocks=1.7.1=py311hecd8cb5_0
++  - pytables=3.8.0=py311h0b11676_3
++  - python=3.11.5=hf27a42d_0
++  - python-dateutil=2.8.2=pyhd3eb1b0_0
++  - python-dotenv=0.21.0=py311hecd8cb5_0
++  - python-fastjsonschema=2.16.2=py311hecd8cb5_0
++  - python-json-logger=2.0.7=py311hecd8cb5_0
++  - python-kaleido=0.2.1=py311hecd8cb5_0
++  - python-libarchive-c=2.9=pyhd3eb1b0_1
++  - python-lmdb=1.4.1=py311hcec6c5f_0
++  - python-lsp-black=1.2.1=py311hecd8cb5_0
++  - python-lsp-jsonrpc=1.0.0=pyhd3eb1b0_0
++  - python-lsp-server=1.7.2=py311hecd8cb5_0
++  - python-slugify=5.0.2=pyhd3eb1b0_0
++  - python-snappy=0.6.1=py311hcec6c5f_0
++  - python-tzdata=2023.3=pyhd3eb1b0_0
++  - python-xxhash=2.0.2=py311h6c40b1e_1
++  - python.app=3=py311h6c40b1e_0
++  - pytoolconfig=1.2.5=py311hecd8cb5_1
++  - pytz=2023.3.post1=py311hecd8cb5_0
++  - pyviz_comms=2.3.0=py311hecd8cb5_0
++  - pywavelets=1.4.1=py311h6c40b1e_0
++  - pyyaml=6.0=py311h6c40b1e_1
++  - pyzmq=23.2.0=py311hcec6c5f_0
++  - qdarkstyle=3.0.2=pyhd3eb1b0_0
++  - qstylizer=0.2.2=py311hecd8cb5_0
++  - qt-main=5.15.2=h1076e38_9
++  - qt-webengine=5.15.9=h90a370e_7
++  - qtawesome=1.2.2=py311hecd8cb5_0
++  - qtconsole=5.4.2=py311hecd8cb5_0
++  - qtpy=2.2.0=py311hecd8cb5_0
++  - qtwebkit=5.212=hbfab81c_5
++  - queuelib=1.5.0=py311hecd8cb5_0
++  - re2=2022.04.01=he9d5cce_0
++  - readline=8.2=hca72f7f_0
++  - regex=2022.7.9=py311h6c40b1e_0
++  - reproc=14.2.4=he9d5cce_1
++  - reproc-cpp=14.2.4=he9d5cce_1
++  - requests=2.31.0=py311hecd8cb5_0
++  - requests-file=1.5.1=pyhd3eb1b0_0
++  - requests-toolbelt=1.0.0=py311hecd8cb5_0
++  - responses=0.13.3=pyhd3eb1b0_0
++  - rfc3339-validator=0.1.4=py311hecd8cb5_0
++  - rfc3986-validator=0.1.1=py311hecd8cb5_0
++  - rope=1.7.0=py311hecd8cb5_0
++  - rtree=1.0.1=py311hecd8cb5_0
++  - ruamel.yaml=0.17.21=py311h6c40b1e_0
++  - ruamel_yaml=0.17.21=py311h6c40b1e_0
++  - s3fs=2023.4.0=py311hecd8cb5_0
++  - safetensors=0.3.2=py311hf2ad997_0
++  - scikit-image=0.20.0=py311hcec6c5f_0
++  - scikit-learn=1.3.0=py311hdb55bb0_0
++  - scipy=1.11.1=py311h7695dc5_0
++  - scrapy=2.8.0=py311hecd8cb5_0
++  - seaborn=0.12.2=py311hecd8cb5_0
++  - send2trash=1.8.0=pyhd3eb1b0_1
++  - service_identity=18.1.0=pyhd3eb1b0_1
++  - setuptools=68.0.0=py311hecd8cb5_0
++  - sip=6.6.2=py311hcec6c5f_0
++  - six=1.16.0=pyhd3eb1b0_1
++  - smart_open=5.2.1=py311hecd8cb5_0
++  - snappy=1.1.9=he9d5cce_0
++  - sniffio=1.2.0=py311hecd8cb5_1
++  - snowballstemmer=2.2.0=pyhd3eb1b0_0
++  - sortedcontainers=2.4.0=pyhd3eb1b0_0
++  - soupsieve=2.4=py311hecd8cb5_0
++  - sphinx=5.0.2=py311hecd8cb5_0
++  - sphinxcontrib-applehelp=1.0.2=pyhd3eb1b0_0
++  - sphinxcontrib-devhelp=1.0.2=pyhd3eb1b0_0
++  - sphinxcontrib-htmlhelp=2.0.0=pyhd3eb1b0_0
++  - sphinxcontrib-jsmath=1.0.1=pyhd3eb1b0_0
++  - sphinxcontrib-qthelp=1.0.3=pyhd3eb1b0_0
++  - sphinxcontrib-serializinghtml=1.1.5=pyhd3eb1b0_0
++  - spyder=5.4.3=py311hecd8cb5_1
++  - spyder-kernels=2.4.4=py311hecd8cb5_0
++  - sqlalchemy=1.4.39=py311h6c40b1e_0
++  - sqlite=3.41.2=h6c40b1e_0
++  - stack_data=0.2.0=pyhd3eb1b0_0
++  - statsmodels=0.14.0=py311hb3a5e46_0
++  - sympy=1.11.1=py311hecd8cb5_0
++  - tabulate=0.8.10=py311hecd8cb5_0
++  - tapi=1000.10.8=ha1b3eb9_0
++  - tbb=2021.8.0=ha357a0b_0
++  - tblib=1.7.0=pyhd3eb1b0_0
++  - tenacity=8.2.2=py311hecd8cb5_0
++  - terminado=0.17.1=py311hecd8cb5_0
++  - text-unidecode=1.3=pyhd3eb1b0_0
++  - textdistance=4.2.1=pyhd3eb1b0_0
++  - threadpoolctl=2.2.0=pyh0d69192_0
++  - three-merge=0.1.1=pyhd3eb1b0_0
++  - tifffile=2023.4.12=py311hecd8cb5_0
++  - tinycss2=1.2.1=py311hecd8cb5_0
++  - tk=8.6.12=h5d9f67b_0
++  - tldextract=3.2.0=pyhd3eb1b0_0
++  - tokenizers=0.13.2=py311h5240035_1
++  - toml=0.10.2=pyhd3eb1b0_0
++  - tomlkit=0.11.1=py311hecd8cb5_0
++  - toolz=0.12.0=py311hecd8cb5_0
++  - tornado=6.3.2=py311h6c40b1e_0
++  - tqdm=4.65.0=py311h85bffb1_0
++  - traitlets=5.7.1=py311hecd8cb5_0
++  - transformers=4.32.1=py311hecd8cb5_0
++  - twisted=22.10.0=py311h6c40b1e_0
++  - typing-extensions=4.7.1=py311hecd8cb5_0
++  - typing_extensions=4.7.1=py311hecd8cb5_0
++  - tzdata=2023c=h04d1e81_0
++  - uc-micro-py=1.0.1=py311hecd8cb5_0
++  - ujson=5.4.0=py311hcec6c5f_0
++  - unidecode=1.2.0=pyhd3eb1b0_0
++  - unixodbc=2.3.11=hb456775_0
++  - urllib3=1.26.16=py311hecd8cb5_0
++  - utf8proc=2.6.1=h9ed2024_0
++  - w3lib=1.21.0=pyhd3eb1b0_0
++  - watchdog=2.1.6=py311h3333b6a_0
++  - wcwidth=0.2.5=pyhd3eb1b0_0
++  - webencodings=0.5.1=py311hecd8cb5_1
++  - websocket-client=0.58.0=py311hecd8cb5_4
++  - werkzeug=2.2.3=py311hecd8cb5_0
++  - whatthepatch=1.0.2=py311hecd8cb5_0
++  - wheel=0.38.4=py311hecd8cb5_0
++  - widgetsnbextension=4.0.5=py311hecd8cb5_0
++  - wrapt=1.14.1=py311h6c40b1e_0
++  - wurlitzer=3.0.2=py311hecd8cb5_0
++  - xarray=2023.6.0=py311hecd8cb5_0
++  - xlwings=0.29.1=py311hecd8cb5_0
++  - xxhash=0.8.0=h9ed2024_3
++  - xyzservices=2022.9.0=py311hecd8cb5_1
++  - xz=5.4.2=h6c40b1e_0
++  - y-py=0.5.9=py311h7242b5c_0
++  - yaml=0.2.5=haf1e3a3_0
++  - yaml-cpp=0.7.0=he9d5cce_1
++  - yapf=0.31.0=pyhd3eb1b0_0
++  - yarl=1.8.1=py311h6c40b1e_0
++  - ypy-websocket=0.8.2=py311hecd8cb5_0
++  - zeromq=4.3.4=h23ab428_0
++  - zfp=1.0.0=hcec6c5f_0
++  - zict=2.2.0=py311hecd8cb5_0
++  - zipp=3.11.0=py311hecd8cb5_0
++  - zlib=1.2.13=h4dc903c_0
++  - zlib-ng=2.0.7=h6c40b1e_0
++  - zope=1.0=py311hecd8cb5_1
++  - zope.interface=5.4.0=py311h6c40b1e_0
++  - zstandard=0.19.0=py311h6c40b1e_0
++  - zstd=1.5.5=hc035e20_0
++  - pip:
++      - alembic==1.13.1
++      - athlib==0.7.8
++      - betterpath==0.2.2
++      - databricks-cli==0.18.0
++      - distlib==0.3.8
++      - docker==6.1.3
++      - docker-pycreds==0.4.0
++      - filelock==3.13.1
++      - gitdb==4.0.11
++      - gitpython==3.1.41
++      - gunicorn==21.2.0
++      - l==0.11.0
++      - mako==1.3.0
++      - mlflow==2.9.2
++      - numpy==1.23.4
++      - oauthlib==3.2.2
++      - protobuf==4.25.2
++      - pytest==7.4.4
++      - querystring-parser==1.2.4
++      - sentry-sdk==1.39.2
++      - setproctitle==1.3.3
++      - smmap==5.0.1
++      - sqlparse==0.4.4
++      - vcversioner==2.16.0.0
++      - virtualenv==20.25.0
++      - wandb==0.16.2
++prefix: /Users/ruilu/anaconda3
+diff --git a/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/config.yaml b/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/config.yaml
+new file mode 100644
+index 0000000..3865ce7
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/config.yaml
+@@ -0,0 +1,27 @@
++wandb_version: 1
++
++path:
++  desc: null
++  value: genres_mod.parquet
++_wandb:
++  desc: null
++  value:
++    python_version: 3.11.5
++    cli_version: 0.16.2
++    is_jupyter_run: false
++    is_kaggle_kernel: false
++    start_time: 1705452597.016476
++    t:
++      1:
++      - 55
++      2:
++      - 55
++      3:
++      - 2
++      - 16
++      - 23
++      4: 3.11.5
++      5: 0.16.2
++      8:
++      - 5
++      13: darwin-x86_64
+diff --git a/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/requirements.txt b/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/requirements.txt
+new file mode 100644
+index 0000000..fa485cc
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/requirements.txt
+@@ -0,0 +1,386 @@
++aiobotocore==2.5.0
++aiofiles==22.1.0
++aiohttp==3.8.5
++aioitertools==0.7.1
++aiosignal==1.2.0
++aiosqlite==0.18.0
++alabaster==0.7.12
++alembic==1.13.1
++anaconda-anon-usage==0.4.2
++anaconda-catalogs==0.2.0
++anaconda-client==1.12.1
++anaconda-cloud-auth==0.1.3
++anaconda-navigator==2.5.0
++anaconda-project==0.11.1
++anyio==3.5.0
++appdirs==1.4.4
++applaunchservices==0.3.0
++appnope==0.1.2
++appscript==1.1.2
++argon2-cffi-bindings==21.2.0
++argon2-cffi==21.3.0
++arrow==1.2.3
++astroid==2.14.2
++astropy==5.1
++asttokens==2.0.5
++async-timeout==4.0.2
++athlib==0.7.8
++atomicwrites==1.4.0
++attrs==22.1.0
++automat==20.2.0
++autopep8==1.6.0
++babel==2.11.0
++backcall==0.2.0
++backports.functools-lru-cache==1.6.4
++backports.tempfile==1.0
++backports.weakref==1.0.post1
++bcrypt==3.2.0
++beautifulsoup4==4.12.2
++betterpath==0.2.2
++binaryornot==0.4.4
++black==0.0
++bleach==4.1.0
++bokeh==3.2.1
++boltons==23.0.0
++botocore==1.29.76
++bottleneck==1.3.5
++brotlipy==0.7.0
++certifi==2023.7.22
++cffi==1.15.1
++chardet==4.0.0
++charset-normalizer==2.0.4
++click==8.0.4
++cloudpickle==2.2.1
++clyent==1.2.2
++colorama==0.4.6
++colorcet==3.0.1
++comm==0.1.2
++conda-build==3.26.1
++conda-content-trust==0.2.0
++conda-index==0.3.0
++conda-libmamba-solver==23.7.0
++conda-pack==0.6.0
++conda-package-handling==2.2.0
++conda-package-streaming==0.9.0
++conda-repo-cli==1.0.75
++conda-token==0.4.0
++conda-verify==3.4.2
++conda==23.7.4
++constantly==15.1.0
++contourpy==1.0.5
++cookiecutter==1.7.3
++cryptography==41.0.3
++cssselect==1.1.0
++cycler==0.11.0
++cytoolz==0.12.0
++dask==2023.6.0
++databricks-cli==0.18.0
++datasets==2.12.0
++datashader==0.15.2
++datashape==0.5.4
++debugpy==1.6.7
++decorator==5.1.1
++defusedxml==0.7.1
++diff-match-patch==20200713
++dill==0.3.6
++distlib==0.3.8
++distributed==2023.6.0
++docker-pycreds==0.4.0
++docker==6.1.3
++docstring-to-markdown==0.11
++docutils==0.18.1
++entrypoints==0.4
++et-xmlfile==1.1.0
++executing==0.8.3
++fastjsonschema==2.16.2
++filelock==3.13.1
++flake8==6.0.0
++flask==2.2.2
++fonttools==4.25.0
++frozenlist==1.3.3
++fsspec==2023.4.0
++future==0.18.3
++gensim==4.3.0
++gitdb==4.0.11
++gitpython==3.1.41
++glob2==0.7
++gmpy2==2.1.2
++greenlet==2.0.1
++gunicorn==21.2.0
++h5py==3.9.0
++heapdict==1.0.1
++holoviews==1.17.1
++huggingface-hub==0.15.1
++hvplot==0.8.4
++hyperlink==21.0.0
++idna==3.4
++imagecodecs==2023.1.23
++imageio==2.31.1
++imagesize==1.4.1
++imbalanced-learn==0.10.1
++importlib-metadata==6.0.0
++incremental==21.3.0
++inflection==0.5.1
++iniconfig==1.1.1
++intake==0.6.8
++intervaltree==3.1.0
++ipykernel==6.25.0
++ipython-genutils==0.2.0
++ipython==8.15.0
++ipywidgets==8.0.4
++isort==5.9.3
++itemadapter==0.3.0
++itemloaders==1.0.4
++itsdangerous==2.0.1
++jaraco.classes==3.2.1
++jedi==0.18.1
++jellyfish==1.0.1
++jinja2-time==0.2.0
++jinja2==3.1.2
++jmespath==0.10.0
++joblib==1.2.0
++json5==0.9.6
++jsonpatch==1.32
++jsonpointer==2.1
++jsonschema==4.17.3
++jupyter-client==7.4.9
++jupyter-console==6.6.3
++jupyter-core==5.3.0
++jupyter-events==0.6.3
++jupyter-server-fileid==0.9.0
++jupyter-server-ydoc==0.8.0
++jupyter-server==1.23.4
++jupyter-ydoc==0.2.4
++jupyter==1.0.0
++jupyterlab-pygments==0.1.2
++jupyterlab-server==2.22.0
++jupyterlab-widgets==3.0.5
++jupyterlab==3.6.3
++kaleido==0.2.1
++keyring==23.13.1
++kiwisolver==1.4.4
++l==0.11.0
++lazy-loader==0.2
++lazy-object-proxy==1.6.0
++libarchive-c==2.9
++libmambapy==1.5.1
++linkify-it-py==2.0.0
++llvmlite==0.40.0
++lmdb==1.4.1
++locket==1.0.0
++lxml==4.9.3
++lz4==4.3.2
++mako==1.3.0
++markdown-it-py==2.2.0
++markdown==3.4.1
++markupsafe==2.1.1
++matplotlib-inline==0.1.6
++matplotlib==3.7.2
++mccabe==0.7.0
++mdit-py-plugins==0.3.0
++mdurl==0.1.0
++mistune==0.8.4
++mlflow==2.9.2
++more-itertools==8.12.0
++mpmath==1.3.0
++msgpack==1.0.3
++multidict==6.0.2
++multipledispatch==0.6.0
++multiprocess==0.70.14
++munkres==1.1.4
++mypy-extensions==1.0.0
++navigator-updater==0.4.0
++nbclassic==0.5.5
++nbclient==0.5.13
++nbconvert==6.5.4
++nbformat==5.9.2
++nest-asyncio==1.5.6
++networkx==3.1
++nltk==3.8.1
++notebook-shim==0.2.2
++notebook==6.5.4
++numba==0.57.0
++numexpr==2.8.4
++numpy==1.23.4
++numpydoc==1.5.0
++oauthlib==3.2.2
++openpyxl==3.0.10
++packaging==23.1
++pandas==2.0.3
++pandocfilters==1.5.0
++panel==1.2.3
++param==1.13.0
++parsel==1.6.0
++parso==0.8.3
++partd==1.4.0
++pathlib==1.0.1
++pathspec==0.10.3
++patsy==0.5.3
++pep8==1.7.1
++pexpect==4.8.0
++pickleshare==0.7.5
++pillow==9.4.0
++pip==23.2.1
++pkce==1.0.3
++pkginfo==1.9.6
++platformdirs==3.10.0
++plotly==5.9.0
++pluggy==1.0.0
++ply==3.11
++poyo==0.5.0
++prometheus-client==0.14.1
++prompt-toolkit==3.0.36
++protego==0.1.16
++protobuf==4.25.2
++psutil==5.9.0
++ptyprocess==0.7.0
++pure-eval==0.2.2
++py-cpuinfo==8.0.0
++pyarrow==11.0.0
++pyasn1-modules==0.2.8
++pyasn1==0.4.8
++pycodestyle==2.10.0
++pycosat==0.6.4
++pycparser==2.21
++pyct==0.5.0
++pycurl==7.45.2
++pydantic==1.10.8
++pydispatcher==2.0.5
++pydocstyle==6.3.0
++pyerfa==2.0.0
++pyflakes==3.0.1
++pygments==2.15.1
++pyjwt==2.4.0
++pylint-venv==2.3.0
++pylint==2.16.2
++pyls-spyder==0.4.0
++pyobjc-core==9.0
++pyobjc-framework-cocoa==9.0
++pyobjc-framework-coreservices==9.0
++pyobjc-framework-fsevents==9.0
++pyodbc==4.0.34
++pyopenssl==23.2.0
++pyparsing==3.0.9
++pyqt5-sip==12.11.0
++pyrsistent==0.18.0
++pysocks==1.7.1
++pytest==7.4.4
++python-dateutil==2.8.2
++python-dotenv==0.21.0
++python-json-logger==2.0.7
++python-lsp-black==1.2.1
++python-lsp-jsonrpc==1.0.0
++python-lsp-server==1.7.2
++python-slugify==5.0.2
++python-snappy==0.6.1
++pytoolconfig==1.2.5
++pytz==2023.3.post1
++pyviz-comms==2.3.0
++pywavelets==1.4.1
++pyyaml==6.0
++pyzmq==23.2.0
++qdarkstyle==3.0.2
++qstylizer==0.2.2
++qtawesome==1.2.2
++qtconsole==5.4.2
++qtpy==2.2.0
++querystring-parser==1.2.4
++queuelib==1.5.0
++regex==2022.7.9
++requests-file==1.5.1
++requests-toolbelt==1.0.0
++requests==2.31.0
++responses==0.13.3
++rfc3339-validator==0.1.4
++rfc3986-validator==0.1.1
++rope==1.7.0
++rtree==1.0.1
++ruamel-yaml-conda==0.17.21
++ruamel.yaml==0.17.21
++s3fs==2023.4.0
++safetensors==0.3.2
++scikit-image==0.20.0
++scikit-learn==1.3.0
++scipy==1.11.1
++scrapy==2.8.0
++seaborn==0.12.2
++send2trash==1.8.0
++sentry-sdk==1.39.2
++service-identity==18.1.0
++setproctitle==1.3.3
++setuptools==68.0.0
++sip==6.6.2
++six==1.16.0
++smart-open==5.2.1
++smmap==5.0.1
++sniffio==1.2.0
++snowballstemmer==2.2.0
++sortedcontainers==2.4.0
++soupsieve==2.4
++sphinx==5.0.2
++sphinxcontrib-applehelp==1.0.2
++sphinxcontrib-devhelp==1.0.2
++sphinxcontrib-htmlhelp==2.0.0
++sphinxcontrib-jsmath==1.0.1
++sphinxcontrib-qthelp==1.0.3
++sphinxcontrib-serializinghtml==1.1.5
++spyder-kernels==2.4.4
++spyder==5.4.3
++sqlalchemy==1.4.39
++sqlparse==0.4.4
++stack-data==0.2.0
++statsmodels==0.14.0
++sympy==1.11.1
++tables==3.8.0
++tabulate==0.8.10
++tblib==1.7.0
++tenacity==8.2.2
++terminado==0.17.1
++text-unidecode==1.3
++textdistance==4.2.1
++threadpoolctl==2.2.0
++three-merge==0.1.1
++tifffile==2023.4.12
++tinycss2==1.2.1
++tldextract==3.2.0
++tokenizers==0.13.2
++toml==0.10.2
++tomlkit==0.11.1
++toolz==0.12.0
++tornado==6.3.2
++tqdm==4.65.0
++traitlets==5.7.1
++transformers==4.32.1
++twisted==22.10.0
++typing-extensions==4.7.1
++tzdata==2023.3
++uc-micro-py==1.0.1
++ujson==5.4.0
++unidecode==1.2.0
++urllib3==1.26.16
++vcversioner==2.16.0.0
++virtualenv==20.25.0
++w3lib==1.21.0
++wandb==0.16.2
++watchdog==2.1.6
++wcwidth==0.2.5
++webencodings==0.5.1
++websocket-client==0.58.0
++werkzeug==2.2.3
++whatthepatch==1.0.2
++wheel==0.38.4
++widgetsnbextension==4.0.5
++wrapt==1.14.1
++wurlitzer==3.0.2
++xarray==2023.6.0
++xlwings==0.29.1
++xxhash==2.0.2
++xyzservices==2022.9.0
++y-py==0.5.9
++yapf==0.31.0
++yarl==1.8.1
++ypy-websocket==0.8.2
++zict==2.2.0
++zipp==3.11.0
++zope.interface==5.4.0
++zstandard==0.19.0
+\ No newline at end of file
+diff --git a/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-metadata.json b/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-metadata.json
+new file mode 100644
+index 0000000..c2553b5
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-metadata.json
+@@ -0,0 +1,54 @@
++{
++    "os": "macOS-10.16-x86_64-i386-64bit",
++    "python": "3.11.5",
++    "heartbeatAt": "2024-01-17T00:49:57.661593",
++    "startedAt": "2024-01-17T00:49:57.005325",
++    "docker": null,
++    "cuda": null,
++    "args": [
++        "artifact",
++        "put",
++        "--name",
++        "exercise_4/genres_mod.parquet",
++        "--type",
++        "raw_data",
++        "--description",
++        "A modified version of the songs dataset",
++        "genres_mod.parquet"
++    ],
++    "state": "running",
++    "program": "/Users/ruilu/anaconda3/bin/wandb",
++    "codePathLocal": null,
++    "git": {
++        "remote": "https://github.com/lurui87/udacity_repo.git",
++        "commit": "59980f519aec8e14cae91f2eb07079a3d206329f"
++    },
++    "email": "lurui0421@gmail.com",
++    "root": "/Users/ruilu/udacity_repo",
++    "host": "Ruis-MBP.lan",
++    "username": "ruilu",
++    "executable": "/Users/ruilu/anaconda3/bin/python",
++    "cpu_count": 8,
++    "cpu_count_logical": 8,
++    "cpu_freq": {
++        "current": 2400,
++        "min": 2400,
++        "max": 2400
++    },
++    "cpu_freq_per_core": [
++        {
++            "current": 2400,
++            "min": 2400,
++            "max": 2400
++        }
++    ],
++    "disk": {
++        "/": {
++            "total": 460.4317207336426,
++            "used": 122.25181579589844
++        }
++    },
++    "memory": {
++        "total": 16.0
++    }
++}
+diff --git a/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-summary.json b/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-summary.json
+new file mode 100644
+index 0000000..b1d4cf9
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-summary.json
+@@ -0,0 +1 @@
++{"_wandb": {"runtime": 4}}
+\ No newline at end of file
+diff --git a/exercise-4/wandb/run-20240116_194957-i4qioqzw/logs/debug-internal.log b/exercise-4/wandb/run-20240116_194957-i4qioqzw/logs/debug-internal.log
+new file mode 100644
+index 0000000..f1ec21f
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_194957-i4qioqzw/logs/debug-internal.log
+@@ -0,0 +1,181 @@
++2024-01-16 19:49:57,017 INFO    StreamThr :54682 [internal.py:wandb_internal():86] W&B internal server running at pid: 54682, started at: 2024-01-16 19:49:57.016519
++2024-01-16 19:49:57,019 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: status
++2024-01-16 19:49:57,023 INFO    WriterThread:54682 [datastore.py:open_for_write():87] open: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/run-i4qioqzw.wandb
++2024-01-16 19:49:57,024 DEBUG   SenderThread:54682 [sender.py:send():382] send: header
++2024-01-16 19:49:57,050 DEBUG   SenderThread:54682 [sender.py:send():382] send: run
++2024-01-16 19:49:57,473 INFO    SenderThread:54682 [dir_watcher.py:__init__():211] watching files in: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files
++2024-01-16 19:49:57,473 INFO    SenderThread:54682 [sender.py:_start_run_threads():1136] run started: i4qioqzw with start time 1705452597.016476
++2024-01-16 19:49:57,489 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: check_version
++2024-01-16 19:49:57,489 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: check_version
++2024-01-16 19:49:57,644 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: run_start
++2024-01-16 19:49:57,659 DEBUG   HandlerThread:54682 [system_info.py:__init__():27] System info init
++2024-01-16 19:49:57,660 DEBUG   HandlerThread:54682 [system_info.py:__init__():42] System info init done
++2024-01-16 19:49:57,660 INFO    HandlerThread:54682 [system_monitor.py:start():194] Starting system monitor
++2024-01-16 19:49:57,660 INFO    SystemMonitor:54682 [system_monitor.py:_start():158] Starting system asset monitoring threads
++2024-01-16 19:49:57,660 INFO    HandlerThread:54682 [system_monitor.py:probe():214] Collecting system info
++2024-01-16 19:49:57,661 DEBUG   HandlerThread:54682 [system_info.py:probe():151] Probing system
++2024-01-16 19:49:57,661 INFO    SystemMonitor:54682 [interfaces.py:start():190] Started cpu monitoring
++2024-01-16 19:49:57,663 INFO    SystemMonitor:54682 [interfaces.py:start():190] Started disk monitoring
++2024-01-16 19:49:57,664 INFO    SystemMonitor:54682 [interfaces.py:start():190] Started memory monitoring
++2024-01-16 19:49:57,664 INFO    SystemMonitor:54682 [interfaces.py:start():190] Started network monitoring
++2024-01-16 19:49:57,676 DEBUG   HandlerThread:54682 [system_info.py:_probe_git():136] Probing git
++2024-01-16 19:49:57,712 DEBUG   HandlerThread:54682 [system_info.py:_probe_git():144] Probing git done
++2024-01-16 19:49:57,712 DEBUG   HandlerThread:54682 [system_info.py:probe():199] Probing system done
++2024-01-16 19:49:57,712 DEBUG   HandlerThread:54682 [system_monitor.py:probe():223] {'os': 'macOS-10.16-x86_64-i386-64bit', 'python': '3.11.5', 'heartbeatAt': '2024-01-17T00:49:57.661593', 'startedAt': '2024-01-17T00:49:57.005325', 'docker': None, 'cuda': None, 'args': ('artifact', 'put', '--name', 'exercise_4/genres_mod.parquet', '--type', 'raw_data', '--description', 'A modified version of the songs dataset', 'genres_mod.parquet'), 'state': 'running', 'program': '/Users/ruilu/anaconda3/bin/wandb', 'codePathLocal': None, 'git': {'remote': 'https://github.com/lurui87/udacity_repo.git', 'commit': '59980f519aec8e14cae91f2eb07079a3d206329f'}, 'email': 'lurui0421@gmail.com', 'root': '/Users/ruilu/udacity_repo', 'host': 'Ruis-MBP.lan', 'username': 'ruilu', 'executable': '/Users/ruilu/anaconda3/bin/python', 'cpu_count': 8, 'cpu_count_logical': 8, 'cpu_freq': {'current': 2400, 'min': 2400, 'max': 2400}, 'cpu_freq_per_core': [{'current': 2400, 'min': 2400, 'max': 2400}], 'disk': {'/': {'total': 460.4317207336426, 'used': 122.25181579589844}}, 'memory': {'total': 16.0}}
++2024-01-16 19:49:57,713 INFO    HandlerThread:54682 [system_monitor.py:probe():224] Finished collecting system info
++2024-01-16 19:49:57,713 INFO    HandlerThread:54682 [system_monitor.py:probe():227] Publishing system info
++2024-01-16 19:49:57,713 DEBUG   HandlerThread:54682 [system_info.py:_save_conda():208] Saving list of conda packages installed into the current environment
++2024-01-16 19:49:58,480 INFO    Thread-12 :54682 [dir_watcher.py:_on_file_created():271] file/dir created: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/conda-environment.yaml
++2024-01-16 19:50:01,910 DEBUG   HandlerThread:54682 [system_info.py:_save_conda():220] Saving conda packages done
++2024-01-16 19:50:01,910 INFO    HandlerThread:54682 [system_monitor.py:probe():229] Finished publishing system info
++2024-01-16 19:50:01,913 DEBUG   SenderThread:54682 [sender.py:send():382] send: files
++2024-01-16 19:50:01,913 INFO    SenderThread:54682 [sender.py:_save_file():1403] saving file wandb-metadata.json with policy now
++2024-01-16 19:50:01,917 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: python_packages
++2024-01-16 19:50:01,917 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: python_packages
++2024-01-16 19:50:01,918 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: stop_status
++2024-01-16 19:50:01,919 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: internal_messages
++2024-01-16 19:50:01,919 DEBUG   SenderThread:54682 [sender.py:send():382] send: telemetry
++2024-01-16 19:50:01,919 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: stop_status
++2024-01-16 19:50:02,183 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: log_artifact
++2024-01-16 19:50:02,255 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: log_artifact
++2024-01-16 19:50:02,256 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: status_report
++2024-01-16 19:50:02,500 INFO    Thread-12 :54682 [dir_watcher.py:_on_file_modified():288] file/dir modified: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/conda-environment.yaml
++2024-01-16 19:50:02,501 INFO    Thread-12 :54682 [dir_watcher.py:_on_file_created():271] file/dir created: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/requirements.txt
++2024-01-16 19:50:02,502 INFO    Thread-12 :54682 [dir_watcher.py:_on_file_created():271] file/dir created: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-metadata.json
++2024-01-16 19:50:02,584 INFO    wandb-upload_0:54682 [upload_job.py:push():131] Uploaded file /var/folders/lw/t_p8zf6s1x76k2_3lv9ndhw40000gn/T/tmpu2e1oeegwandb/61hbdvtj-wandb-metadata.json
++2024-01-16 19:50:02,761 INFO    SenderThread:54682 [sender.py:send_request_log_artifact():1470] logged artifact genres_mod.parquet - {'id': 'QXJ0aWZhY3Q6NjkzMDg3OTYx', 'state': 'PENDING', 'artifactSequence': {'id': 'QXJ0aWZhY3RDb2xsZWN0aW9uOjEzMDk3OTg4NQ==', 'latestArtifact': None}}
++2024-01-16 19:50:02,762 DEBUG   SenderThread:54682 [sender.py:send():382] send: telemetry
++2024-01-16 19:50:02,762 DEBUG   SenderThread:54682 [sender.py:send():382] send: exit
++2024-01-16 19:50:02,763 INFO    SenderThread:54682 [sender.py:send_exit():589] handling exit code: 0
++2024-01-16 19:50:02,764 INFO    SenderThread:54682 [sender.py:send_exit():591] handling runtime: 4
++2024-01-16 19:50:02,770 INFO    SenderThread:54682 [sender.py:_save_file():1403] saving file wandb-summary.json with policy end
++2024-01-16 19:50:02,771 INFO    SenderThread:54682 [sender.py:send_exit():597] send defer
++2024-01-16 19:50:02,772 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:02,773 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 0
++2024-01-16 19:50:02,774 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:02,774 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 0
++2024-01-16 19:50:02,774 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 1
++2024-01-16 19:50:02,774 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:02,775 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 1
++2024-01-16 19:50:02,775 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:02,775 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 1
++2024-01-16 19:50:02,775 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 2
++2024-01-16 19:50:02,775 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:02,775 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 2
++2024-01-16 19:50:02,775 INFO    HandlerThread:54682 [system_monitor.py:finish():203] Stopping system monitor
++2024-01-16 19:50:02,780 DEBUG   SystemMonitor:54682 [system_monitor.py:_start():172] Starting system metrics aggregation loop
++2024-01-16 19:50:02,780 DEBUG   SystemMonitor:54682 [system_monitor.py:_start():179] Finished system metrics aggregation loop
++2024-01-16 19:50:02,781 DEBUG   SystemMonitor:54682 [system_monitor.py:_start():183] Publishing last batch of metrics
++2024-01-16 19:50:02,782 INFO    HandlerThread:54682 [interfaces.py:finish():202] Joined cpu monitor
++2024-01-16 19:50:02,784 INFO    HandlerThread:54682 [interfaces.py:finish():202] Joined disk monitor
++2024-01-16 19:50:02,785 INFO    HandlerThread:54682 [interfaces.py:finish():202] Joined memory monitor
++2024-01-16 19:50:02,785 INFO    HandlerThread:54682 [interfaces.py:finish():202] Joined network monitor
++2024-01-16 19:50:02,786 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:02,786 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 2
++2024-01-16 19:50:02,787 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 3
++2024-01-16 19:50:02,787 DEBUG   SenderThread:54682 [sender.py:send():382] send: stats
++2024-01-16 19:50:02,787 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:02,789 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 3
++2024-01-16 19:50:02,789 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:02,789 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 3
++2024-01-16 19:50:02,790 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 4
++2024-01-16 19:50:02,790 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:02,790 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 4
++2024-01-16 19:50:02,790 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:02,790 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 4
++2024-01-16 19:50:02,790 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 5
++2024-01-16 19:50:02,790 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:02,790 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 5
++2024-01-16 19:50:02,791 DEBUG   SenderThread:54682 [sender.py:send():382] send: summary
++2024-01-16 19:50:02,792 INFO    SenderThread:54682 [sender.py:_save_file():1403] saving file wandb-summary.json with policy end
++2024-01-16 19:50:02,792 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:02,792 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 5
++2024-01-16 19:50:02,793 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 6
++2024-01-16 19:50:02,793 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:02,793 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 6
++2024-01-16 19:50:02,793 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:02,793 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 6
++2024-01-16 19:50:02,796 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: status_report
++2024-01-16 19:50:02,926 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 7
++2024-01-16 19:50:02,926 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:02,926 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 7
++2024-01-16 19:50:02,926 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:02,926 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 7
++2024-01-16 19:50:02,926 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 8
++2024-01-16 19:50:02,927 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:02,927 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 8
++2024-01-16 19:50:02,927 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:02,927 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 8
++2024-01-16 19:50:02,927 INFO    SenderThread:54682 [job_builder.py:build():296] Attempting to build job artifact
++2024-01-16 19:50:02,927 INFO    SenderThread:54682 [job_builder.py:_get_source_type():426] is repo sourced job
++2024-01-16 19:50:02,927 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 9
++2024-01-16 19:50:02,927 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:02,927 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 9
++2024-01-16 19:50:02,928 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:02,928 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 9
++2024-01-16 19:50:02,928 INFO    SenderThread:54682 [dir_watcher.py:finish():358] shutting down directory watcher
++2024-01-16 19:50:03,190 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: poll_exit
++2024-01-16 19:50:03,507 INFO    Thread-12 :54682 [dir_watcher.py:_on_file_modified():288] file/dir modified: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/config.yaml
++2024-01-16 19:50:03,509 INFO    SenderThread:54682 [dir_watcher.py:_on_file_created():271] file/dir created: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-summary.json
++2024-01-16 19:50:03,517 INFO    SenderThread:54682 [dir_watcher.py:finish():388] scan: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files
++2024-01-16 19:50:03,518 INFO    SenderThread:54682 [dir_watcher.py:finish():402] scan save: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/requirements.txt requirements.txt
++2024-01-16 19:50:03,519 INFO    SenderThread:54682 [dir_watcher.py:finish():402] scan save: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/config.yaml config.yaml
++2024-01-16 19:50:03,529 INFO    SenderThread:54682 [dir_watcher.py:finish():402] scan save: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-summary.json wandb-summary.json
++2024-01-16 19:50:03,531 INFO    SenderThread:54682 [dir_watcher.py:finish():402] scan save: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/conda-environment.yaml conda-environment.yaml
++2024-01-16 19:50:03,532 INFO    SenderThread:54682 [dir_watcher.py:finish():402] scan save: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-metadata.json wandb-metadata.json
++2024-01-16 19:50:03,532 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 10
++2024-01-16 19:50:03,532 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: poll_exit
++2024-01-16 19:50:03,542 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:03,544 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 10
++2024-01-16 19:50:03,550 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:03,551 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 10
++2024-01-16 19:50:03,551 INFO    SenderThread:54682 [file_pusher.py:finish():175] shutting down file pusher
++2024-01-16 19:50:03,893 INFO    wandb-upload_0:54682 [upload_job.py:push():89] Uploaded file /Users/ruilu/Library/Application Support/wandb/artifacts/staging/tmpgixvrs5j
++2024-01-16 19:50:04,016 INFO    wandb-upload_1:54682 [upload_job.py:push():131] Uploaded file /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/requirements.txt
++2024-01-16 19:50:04,177 INFO    wandb-upload_2:54682 [upload_job.py:push():131] Uploaded file /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/config.yaml
++2024-01-16 19:50:04,195 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: poll_exit
++2024-01-16 19:50:04,196 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: poll_exit
++2024-01-16 19:50:04,427 INFO    wandb-upload_3:54682 [upload_job.py:push():131] Uploaded file /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/wandb-summary.json
++2024-01-16 19:50:04,467 INFO    wandb-upload_4:54682 [upload_job.py:push():131] Uploaded file /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/files/conda-environment.yaml
++2024-01-16 19:50:04,826 INFO    Thread-11 (_thread_body):54682 [sender.py:transition_state():617] send defer: 11
++2024-01-16 19:50:04,828 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:04,829 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 11
++2024-01-16 19:50:04,830 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:04,831 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 11
++2024-01-16 19:50:04,831 INFO    SenderThread:54682 [file_pusher.py:join():181] waiting for file pusher
++2024-01-16 19:50:04,831 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 12
++2024-01-16 19:50:04,832 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:04,832 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 12
++2024-01-16 19:50:04,833 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:04,833 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 12
++2024-01-16 19:50:04,833 INFO    SenderThread:54682 [file_stream.py:finish():595] file stream finish called
++2024-01-16 19:50:05,203 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: poll_exit
++2024-01-16 19:50:05,238 INFO    SenderThread:54682 [file_stream.py:finish():599] file stream finish is done
++2024-01-16 19:50:05,238 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 13
++2024-01-16 19:50:05,238 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: poll_exit
++2024-01-16 19:50:05,239 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:05,239 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 13
++2024-01-16 19:50:05,240 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:05,240 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 13
++2024-01-16 19:50:05,240 INFO    SenderThread:54682 [sender.py:transition_state():617] send defer: 14
++2024-01-16 19:50:05,241 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 19:50:05,241 INFO    HandlerThread:54682 [handler.py:handle_request_defer():172] handle defer: 14
++2024-01-16 19:50:05,243 DEBUG   SenderThread:54682 [sender.py:send():382] send: final
++2024-01-16 19:50:05,243 DEBUG   SenderThread:54682 [sender.py:send():382] send: footer
++2024-01-16 19:50:05,243 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: defer
++2024-01-16 19:50:05,244 INFO    SenderThread:54682 [sender.py:send_request_defer():613] handle sender defer: 14
++2024-01-16 19:50:05,246 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: poll_exit
++2024-01-16 19:50:05,247 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: poll_exit
++2024-01-16 19:50:05,248 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: internal_messages
++2024-01-16 19:50:05,250 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: server_info
++2024-01-16 19:50:05,250 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: get_summary
++2024-01-16 19:50:05,250 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: sampled_history
++2024-01-16 19:50:05,250 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: job_info
++2024-01-16 19:50:05,252 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: server_info
++2024-01-16 19:50:05,361 DEBUG   SenderThread:54682 [sender.py:send_request():409] send_request: job_info
++2024-01-16 19:50:05,365 DEBUG   HandlerThread:54682 [handler.py:handle_request():146] handle_request: shutdown
++2024-01-16 19:50:05,366 INFO    HandlerThread:54682 [handler.py:finish():869] shutting down handler
++2024-01-16 19:50:06,254 INFO    WriterThread:54682 [datastore.py:close():296] close: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/run-i4qioqzw.wandb
++2024-01-16 19:50:06,363 INFO    SenderThread:54682 [sender.py:finish():1572] shutting down sender
++2024-01-16 19:50:06,364 INFO    SenderThread:54682 [file_pusher.py:finish():175] shutting down file pusher
++2024-01-16 19:50:06,365 INFO    SenderThread:54682 [file_pusher.py:join():181] waiting for file pusher
+diff --git a/exercise-4/wandb/run-20240116_194957-i4qioqzw/logs/debug.log b/exercise-4/wandb/run-20240116_194957-i4qioqzw/logs/debug.log
+new file mode 100644
+index 0000000..a6957dc
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_194957-i4qioqzw/logs/debug.log
+@@ -0,0 +1,34 @@
++2024-01-16 19:49:57,007 INFO    MainThread:54670 [wandb_setup.py:_flush():76] Current SDK version is 0.16.2
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_setup.py:_flush():76] Configure stats pid to 54670
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_setup.py:_flush():76] Loading settings from /Users/ruilu/.config/wandb/settings
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_setup.py:_flush():76] Loading settings from /Users/ruilu/udacity_repo/exercise-4/wandb/settings
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_setup.py:_flush():76] Loading settings from environment variables: {'entity': 'ruilu', 'project': 'exercise_4'}
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_setup.py:_flush():76] Applying setup settings: {'_disable_service': False}
++2024-01-16 19:49:57,008 WARNING MainThread:54670 [wandb_setup.py:_flush():76] Could not save program above cwd: /Users/ruilu/anaconda3/bin/wandb
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': None, 'program_abspath': '/Users/ruilu/anaconda3/bin/wandb', 'program': '/Users/ruilu/anaconda3/bin/wandb'}
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_init.py:_log_setup():526] Logging user logs to /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/logs/debug.log
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_init.py:_log_setup():527] Logging internal logs to /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_194957-i4qioqzw/logs/debug-internal.log
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_init.py:init():566] calling init triggers
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_init.py:init():573] wandb.init called with sweep_config: {}
++config: {'path': 'genres_mod.parquet'}
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_init.py:init():616] starting backend
++2024-01-16 19:49:57,008 INFO    MainThread:54670 [wandb_init.py:init():620] setting up manager
++2024-01-16 19:49:57,014 INFO    MainThread:54670 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=spawn,fork,forkserver, using: spawn
++2024-01-16 19:49:57,016 INFO    MainThread:54670 [wandb_init.py:init():628] backend started and connected
++2024-01-16 19:49:57,023 INFO    MainThread:54670 [wandb_init.py:init():720] updated telemetry
++2024-01-16 19:49:57,048 INFO    MainThread:54670 [wandb_init.py:init():753] communicating run to backend with 90.0 second timeout
++2024-01-16 19:49:57,488 INFO    MainThread:54670 [wandb_run.py:_on_init():2254] communicating current version
++2024-01-16 19:49:57,641 INFO    MainThread:54670 [wandb_run.py:_on_init():2263] got version response 
++2024-01-16 19:49:57,642 INFO    MainThread:54670 [wandb_init.py:init():804] starting run threads in backend
++2024-01-16 19:50:01,917 INFO    MainThread:54670 [wandb_run.py:_console_start():2233] atexit reg
++2024-01-16 19:50:01,917 INFO    MainThread:54670 [wandb_run.py:_redirect():2088] redirect: wrap_raw
++2024-01-16 19:50:01,917 INFO    MainThread:54670 [wandb_run.py:_redirect():2153] Wrapping output streams.
++2024-01-16 19:50:01,917 INFO    MainThread:54670 [wandb_run.py:_redirect():2178] Redirects installed.
++2024-01-16 19:50:01,918 INFO    MainThread:54670 [wandb_init.py:init():847] run started, returning control to user process
++2024-01-16 19:50:02,184 INFO    MainThread:54670 [wandb_run.py:_finish():1962] finishing run ruilu/exercise_4/i4qioqzw
++2024-01-16 19:50:02,184 INFO    MainThread:54670 [wandb_run.py:_atexit_cleanup():2202] got exitcode: 0
++2024-01-16 19:50:02,184 INFO    MainThread:54670 [wandb_run.py:_restore():2185] restore
++2024-01-16 19:50:02,185 INFO    MainThread:54670 [wandb_run.py:_restore():2191] restore done
++2024-01-16 19:50:06,373 INFO    MainThread:54670 [wandb_run.py:_footer_history_summary_info():3857] rendering history
++2024-01-16 19:50:06,374 INFO    MainThread:54670 [wandb_run.py:_footer_history_summary_info():3889] rendering summary
++2024-01-16 19:50:06,387 INFO    MainThread:54670 [wandb_run.py:_footer_sync_info():3816] logging synced files
+diff --git a/exercise-4/wandb/run-20240116_194957-i4qioqzw/run-i4qioqzw.wandb b/exercise-4/wandb/run-20240116_194957-i4qioqzw/run-i4qioqzw.wandb
+new file mode 100644
+index 0000000..628268a
+Binary files /dev/null and b/exercise-4/wandb/run-20240116_194957-i4qioqzw/run-i4qioqzw.wandb differ
+diff --git a/exercise-4/wandb/run-20240116_201830-43b9bfur/files/conda-environment.yaml b/exercise-4/wandb/run-20240116_201830-43b9bfur/files/conda-environment.yaml
+new file mode 100644
+index 0000000..7e98459
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_201830-43b9bfur/files/conda-environment.yaml
+@@ -0,0 +1,530 @@
++name: base
++channels:
++  - defaults
++dependencies:
++  - _anaconda_depends=2023.09=py311_openblas_1
++  - abseil-cpp=20211102.0=he9d5cce_0
++  - aiobotocore=2.5.0=py311hecd8cb5_0
++  - aiofiles=22.1.0=py311hecd8cb5_0
++  - aiohttp=3.8.5=py311h6c40b1e_0
++  - aioitertools=0.7.1=pyhd3eb1b0_0
++  - aiosignal=1.2.0=pyhd3eb1b0_0
++  - aiosqlite=0.18.0=py311hecd8cb5_0
++  - alabaster=0.7.12=pyhd3eb1b0_0
++  - anaconda-anon-usage=0.4.2=py311hfb7c958_0
++  - anaconda-catalogs=0.2.0=py311hecd8cb5_0
++  - anaconda-client=1.12.1=py311hecd8cb5_0
++  - anaconda-cloud-auth=0.1.3=py311hecd8cb5_0
++  - anaconda-navigator=2.5.0=py311hecd8cb5_0
++  - anaconda-project=0.11.1=py311hecd8cb5_0
++  - anyio=3.5.0=py311hecd8cb5_0
++  - aom=3.6.0=hcec6c5f_0
++  - appdirs=1.4.4=pyhd3eb1b0_0
++  - applaunchservices=0.3.0=py311hecd8cb5_0
++  - appnope=0.1.2=py311hecd8cb5_1001
++  - appscript=1.1.2=py311h6c40b1e_0
++  - argon2-cffi=21.3.0=pyhd3eb1b0_0
++  - argon2-cffi-bindings=21.2.0=py311h6c40b1e_0
++  - arrow=1.2.3=py311hecd8cb5_1
++  - arrow-cpp=11.0.0=h89a8245_2
++  - astroid=2.14.2=py311hecd8cb5_0
++  - astropy=5.1=py311hb9e55a9_0
++  - asttokens=2.0.5=pyhd3eb1b0_0
++  - async-timeout=4.0.2=py311hecd8cb5_0
++  - atomicwrites=1.4.0=py_0
++  - attrs=22.1.0=py311hecd8cb5_0
++  - automat=20.2.0=py_0
++  - autopep8=1.6.0=pyhd3eb1b0_1
++  - aws-c-common=0.6.8=h6c40b1e_1
++  - aws-c-event-stream=0.1.6=hcec6c5f_6
++  - aws-checksums=0.1.11=h6c40b1e_2
++  - aws-sdk-cpp=1.8.185=h1a8d504_1
++  - babel=2.11.0=py311hecd8cb5_0
++  - backcall=0.2.0=pyhd3eb1b0_0
++  - backports=1.1=pyhd3eb1b0_0
++  - backports.functools_lru_cache=1.6.4=pyhd3eb1b0_0
++  - backports.tempfile=1.0=pyhd3eb1b0_1
++  - backports.weakref=1.0.post1=py_1
++  - bcrypt=3.2.0=py311h6c40b1e_1
++  - beautifulsoup4=4.12.2=py311hecd8cb5_0
++  - binaryornot=0.4.4=pyhd3eb1b0_1
++  - black=23.3.0=py311hecd8cb5_0
++  - blas=1.0=openblas
++  - bleach=4.1.0=pyhd3eb1b0_0
++  - blosc=1.21.3=hcec6c5f_0
++  - bokeh=3.2.1=py311h85bffb1_0
++  - boltons=23.0.0=py311hecd8cb5_0
++  - boost-cpp=1.73.0=hca72f7f_12
++  - botocore=1.29.76=py311hecd8cb5_0
++  - bottleneck=1.3.5=py311hb9e55a9_0
++  - brotli=1.0.9=hca72f7f_7
++  - brotli-bin=1.0.9=hca72f7f_7
++  - brotlipy=0.7.0=py311h6c40b1e_1002
++  - brunsli=0.1=h23ab428_0
++  - bzip2=1.0.8=h1de35cc_0
++  - c-ares=1.19.1=h6c40b1e_0
++  - c-blosc2=2.8.0=hcec6c5f_0
++  - ca-certificates=2023.08.22=hecd8cb5_0
++  - cctools=949.0.1=h9abeeb2_25
++  - cctools_osx-64=949.0.1=hc7db93f_25
++  - certifi=2023.7.22=py311hecd8cb5_0
++  - cffi=1.15.1=py311h6c40b1e_3
++  - cfitsio=3.470=hbd21bf8_7
++  - chardet=4.0.0=py311hecd8cb5_1003
++  - charls=2.2.0=h23ab428_0
++  - charset-normalizer=2.0.4=pyhd3eb1b0_0
++  - click=8.0.4=py311hecd8cb5_0
++  - cloudpickle=2.2.1=py311hecd8cb5_0
++  - clyent=1.2.2=py311hecd8cb5_1
++  - colorama=0.4.6=py311hecd8cb5_0
++  - colorcet=3.0.1=py311hecd8cb5_0
++  - comm=0.1.2=py311hecd8cb5_0
++  - conda=23.7.4=py311hecd8cb5_0
++  - conda-build=3.26.1=py311hecd8cb5_0
++  - conda-content-trust=0.2.0=py311hecd8cb5_0
++  - conda-index=0.3.0=py311hecd8cb5_0
++  - conda-libmamba-solver=23.7.0=py311hecd8cb5_0
++  - conda-pack=0.6.0=pyhd3eb1b0_0
++  - conda-package-handling=2.2.0=py311hecd8cb5_0
++  - conda-package-streaming=0.9.0=py311hecd8cb5_0
++  - conda-repo-cli=1.0.75=py311hecd8cb5_0
++  - conda-token=0.4.0=pyhd3eb1b0_0
++  - conda-verify=3.4.2=py_1
++  - constantly=15.1.0=py311hecd8cb5_0
++  - contourpy=1.0.5=py311ha357a0b_0
++  - cookiecutter=1.7.3=pyhd3eb1b0_0
++  - cryptography=41.0.3=py311h30e54ef_0
++  - cssselect=1.1.0=pyhd3eb1b0_0
++  - curl=8.2.1=h04015c4_0
++  - cycler=0.11.0=pyhd3eb1b0_0
++  - cyrus-sasl=2.1.28=h3973f50_1
++  - cytoolz=0.12.0=py311h6c40b1e_0
++  - dask=2023.6.0=py311hecd8cb5_0
++  - dask-core=2023.6.0=py311hecd8cb5_0
++  - datasets=2.12.0=py311hecd8cb5_0
++  - datashader=0.15.2=py311hecd8cb5_0
++  - datashape=0.5.4=py311hecd8cb5_1
++  - dav1d=1.2.1=h6c40b1e_0
++  - debugpy=1.6.7=py311hcec6c5f_0
++  - decorator=5.1.1=pyhd3eb1b0_0
++  - defusedxml=0.7.1=pyhd3eb1b0_0
++  - diff-match-patch=20200713=pyhd3eb1b0_0
++  - dill=0.3.6=py311hecd8cb5_0
++  - distributed=2023.6.0=py311hecd8cb5_0
++  - docstring-to-markdown=0.11=py311hecd8cb5_0
++  - docutils=0.18.1=py311hecd8cb5_3
++  - entrypoints=0.4=py311hecd8cb5_0
++  - et_xmlfile=1.1.0=py311hecd8cb5_0
++  - executing=0.8.3=pyhd3eb1b0_0
++  - flake8=6.0.0=py311hecd8cb5_0
++  - flask=2.2.2=py311hecd8cb5_0
++  - fmt=9.1.0=ha357a0b_0
++  - fonttools=4.25.0=pyhd3eb1b0_0
++  - freetype=2.12.1=hd8bbffd_0
++  - frozenlist=1.3.3=py311h6c40b1e_0
++  - fsspec=2023.4.0=py311hecd8cb5_0
++  - future=0.18.3=py311hecd8cb5_0
++  - gensim=4.3.0=py311hc5848a5_0
++  - gettext=0.21.0=he85b6c0_1
++  - gflags=2.2.2=h0a44026_0
++  - giflib=5.2.1=h6c40b1e_3
++  - glib=2.69.1=hfff2838_2
++  - glob2=0.7=pyhd3eb1b0_0
++  - glog=0.5.0=h23ab428_0
++  - gmp=6.2.1=he9d5cce_3
++  - gmpy2=2.1.2=py311h1c2e9e1_0
++  - greenlet=2.0.1=py311hcec6c5f_0
++  - grpc-cpp=1.48.2=h4ed1731_1
++  - gst-plugins-base=1.14.1=hcec6c5f_1
++  - gstreamer=1.14.1=h6c40b1e_1
++  - h5py=3.9.0=py311hdb7e403_0
++  - hdf5=1.12.1=ha01d115_3
++  - heapdict=1.0.1=pyhd3eb1b0_0
++  - holoviews=1.17.1=py311hecd8cb5_0
++  - huggingface_hub=0.15.1=py311hecd8cb5_0
++  - hvplot=0.8.4=py311hecd8cb5_0
++  - hyperlink=21.0.0=pyhd3eb1b0_0
++  - icu=58.2=h0a44026_3
++  - idna=3.4=py311hecd8cb5_0
++  - imagecodecs=2023.1.23=py311h89890a9_0
++  - imageio=2.31.1=py311hecd8cb5_0
++  - imagesize=1.4.1=py311hecd8cb5_0
++  - imbalanced-learn=0.10.1=py311hecd8cb5_1
++  - importlib-metadata=6.0.0=py311hecd8cb5_0
++  - importlib_metadata=6.0.0=hd3eb1b0_0
++  - incremental=21.3.0=pyhd3eb1b0_0
++  - inflection=0.5.1=py311hecd8cb5_0
++  - iniconfig=1.1.1=pyhd3eb1b0_0
++  - intake=0.6.8=py311hecd8cb5_0
++  - intervaltree=3.1.0=pyhd3eb1b0_0
++  - ipykernel=6.25.0=py311h85bffb1_0
++  - ipython=8.15.0=py311hecd8cb5_0
++  - ipython_genutils=0.2.0=pyhd3eb1b0_1
++  - ipywidgets=8.0.4=py311hecd8cb5_0
++  - isort=5.9.3=pyhd3eb1b0_0
++  - itemadapter=0.3.0=pyhd3eb1b0_0
++  - itemloaders=1.0.4=pyhd3eb1b0_1
++  - itsdangerous=2.0.1=pyhd3eb1b0_0
++  - jaraco.classes=3.2.1=pyhd3eb1b0_0
++  - jedi=0.18.1=py311hecd8cb5_1
++  - jellyfish=1.0.1=py311haa3eb71_0
++  - jinja2=3.1.2=py311hecd8cb5_0
++  - jinja2-time=0.2.0=pyhd3eb1b0_3
++  - jmespath=0.10.0=pyhd3eb1b0_0
++  - joblib=1.2.0=py311hecd8cb5_0
++  - jpeg=9e=h6c40b1e_1
++  - jq=1.6=h9ed2024_1000
++  - json5=0.9.6=pyhd3eb1b0_0
++  - jsonpatch=1.32=pyhd3eb1b0_0
++  - jsonpointer=2.1=pyhd3eb1b0_0
++  - jsonschema=4.17.3=py311hecd8cb5_0
++  - jupyter=1.0.0=py311hecd8cb5_8
++  - jupyter_client=7.4.9=py311hecd8cb5_0
++  - jupyter_console=6.6.3=py311hecd8cb5_0
++  - jupyter_core=5.3.0=py311hecd8cb5_0
++  - jupyter_events=0.6.3=py311hecd8cb5_0
++  - jupyter_server=1.23.4=py311hecd8cb5_0
++  - jupyter_server_fileid=0.9.0=py311hecd8cb5_0
++  - jupyter_server_ydoc=0.8.0=py311hecd8cb5_1
++  - jupyter_ydoc=0.2.4=py311hecd8cb5_0
++  - jupyterlab=3.6.3=py311hecd8cb5_0
++  - jupyterlab_pygments=0.1.2=py_0
++  - jupyterlab_server=2.22.0=py311hecd8cb5_0
++  - jupyterlab_widgets=3.0.5=py311hecd8cb5_0
++  - jxrlib=1.1=haf1e3a3_2
++  - kaleido-core=0.2.1=hb664fd8_0
++  - keyring=23.13.1=py311hecd8cb5_0
++  - kiwisolver=1.4.4=py311hcec6c5f_0
++  - krb5=1.20.1=h428f121_1
++  - lazy-object-proxy=1.6.0=py311h6c40b1e_0
++  - lazy_loader=0.2=py311hecd8cb5_0
++  - lcms2=2.12=hf1fd2bf_0
++  - ld64=530=h20443b4_25
++  - ld64_osx-64=530=h70f3046_25
++  - ldid=2.1.5=hc58f1be_3
++  - lerc=3.0=he9d5cce_0
++  - libaec=1.0.4=hb1e8313_1
++  - libarchive=3.6.2=h29ab7a1_2
++  - libavif=0.11.1=h6c40b1e_0
++  - libboost=1.73.0=h3fa6bed_12
++  - libbrotlicommon=1.0.9=hca72f7f_7
++  - libbrotlidec=1.0.9=hca72f7f_7
++  - libbrotlienc=1.0.9=hca72f7f_7
++  - libclang=14.0.6=default_hd95374b_1
++  - libclang13=14.0.6=default_habbcc1a_1
++  - libcurl=8.2.1=hf20ceda_0
++  - libcxx=14.0.6=h9765a3e_0
++  - libdeflate=1.17=hb664fd8_0
++  - libedit=3.1.20221030=h6c40b1e_0
++  - libev=4.33=h9ed2024_1
++  - libevent=2.1.12=h04015c4_1
++  - libffi=3.4.4=hecd8cb5_0
++  - libgfortran=5.0.0=11_3_0_hecd8cb5_28
++  - libgfortran5=11.3.0=h9dfd629_28
++  - libiconv=1.16=hca72f7f_2
++  - liblief=0.12.3=hcec6c5f_0
++  - libllvm14=14.0.6=h91fad77_3
++  - libmamba=1.5.1=h63cd6dc_0
++  - libmambapy=1.5.1=py311h8c3233a_0
++  - libnghttp2=1.52.0=h9beae6a_1
++  - libopenblas=0.3.21=h54e7dc3_0
++  - libpng=1.6.39=h6c40b1e_0
++  - libpq=12.15=h04015c4_1
++  - libprotobuf=3.20.3=hfff2838_0
++  - libsodium=1.0.18=h1de35cc_0
++  - libsolv=0.7.24=hfff2838_0
++  - libspatialindex=1.9.3=h23ab428_0
++  - libssh2=1.10.0=h04015c4_2
++  - libthrift=0.15.0=h70b4b81_2
++  - libtiff=4.5.1=hcec6c5f_0
++  - libwebp=1.3.2=hf6ce154_0
++  - libwebp-base=1.3.2=h6c40b1e_0
++  - libxml2=2.10.4=h930c0e2_0
++  - libxslt=1.1.37=h6d1eb0e_0
++  - libzopfli=1.0.3=hb1e8313_0
++  - linkify-it-py=2.0.0=py311hecd8cb5_0
++  - llvm-openmp=14.0.6=h0dcd299_0
++  - llvmlite=0.40.0=py311hfff2838_0
++  - locket=1.0.0=py311hecd8cb5_0
++  - lxml=4.9.3=py311h946e0e5_0
++  - lz4=4.3.2=py311h6c40b1e_0
++  - lz4-c=1.9.4=hcec6c5f_0
++  - lzo=2.10=haf1e3a3_2
++  - markdown=3.4.1=py311hecd8cb5_0
++  - markdown-it-py=2.2.0=py311hecd8cb5_1
++  - markupsafe=2.1.1=py311h6c40b1e_0
++  - mathjax=2.7.5=hecd8cb5_0
++  - matplotlib=3.7.2=py311hecd8cb5_0
++  - matplotlib-base=3.7.2=py311h8251f7d_0
++  - matplotlib-inline=0.1.6=py311hecd8cb5_0
++  - mccabe=0.7.0=pyhd3eb1b0_0
++  - mdit-py-plugins=0.3.0=py311hecd8cb5_0
++  - mdurl=0.1.0=py311hecd8cb5_0
++  - mistune=0.8.4=py311h6c40b1e_1000
++  - more-itertools=8.12.0=pyhd3eb1b0_0
++  - mpc=1.1.0=h6ef4df4_1
++  - mpfr=4.0.2=h9066e36_1
++  - mpmath=1.3.0=py311hecd8cb5_0
++  - msgpack-python=1.0.3=py311ha357a0b_0
++  - multidict=6.0.2=py311h6c40b1e_0
++  - multipledispatch=0.6.0=py311hecd8cb5_0
++  - multiprocess=0.70.14=py311hecd8cb5_0
++  - munkres=1.1.4=py_0
++  - mypy_extensions=1.0.0=py311hecd8cb5_0
++  - mysql=5.7.24=h1a8d504_2
++  - navigator-updater=0.4.0=py311hecd8cb5_1
++  - nbclassic=0.5.5=py311hecd8cb5_0
++  - nbclient=0.5.13=py311hecd8cb5_0
++  - nbconvert=6.5.4=py311hecd8cb5_0
++  - nbformat=5.9.2=py311hecd8cb5_0
++  - ncurses=6.4=hcec6c5f_0
++  - nest-asyncio=1.5.6=py311hecd8cb5_0
++  - networkx=3.1=py311hecd8cb5_0
++  - nltk=3.8.1=py311hecd8cb5_0
++  - notebook=6.5.4=py311hecd8cb5_1
++  - notebook-shim=0.2.2=py311hecd8cb5_0
++  - numba=0.57.0=py311hdb55bb0_0
++  - numexpr=2.8.4=py311hd0e4f0d_1
++  - numpydoc=1.5.0=py311hecd8cb5_0
++  - oniguruma=6.9.7.1=h9ed2024_0
++  - openjpeg=2.4.0=h66ea3da_0
++  - openpyxl=3.0.10=py311h6c40b1e_0
++  - openssl=3.0.10=hca72f7f_2
++  - orc=1.7.4=h995b336_1
++  - packaging=23.1=py311hecd8cb5_0
++  - pandas=2.0.3=py311hdb55bb0_0
++  - pandocfilters=1.5.0=pyhd3eb1b0_0
++  - panel=1.2.3=py311hecd8cb5_0
++  - param=1.13.0=py311hecd8cb5_0
++  - parsel=1.6.0=py311hecd8cb5_0
++  - parso=0.8.3=pyhd3eb1b0_0
++  - partd=1.4.0=py311hecd8cb5_0
++  - patch=2.7.6=h1de35cc_1001
++  - pathlib=1.0.1=pyhd3eb1b0_1
++  - pathspec=0.10.3=py311hecd8cb5_0
++  - patsy=0.5.3=py311hecd8cb5_0
++  - pcre=8.45=h23ab428_0
++  - pcre2=10.42=h9b97e30_0
++  - pep8=1.7.1=py311hecd8cb5_1
++  - pexpect=4.8.0=pyhd3eb1b0_3
++  - pickleshare=0.7.5=pyhd3eb1b0_1003
++  - pillow=9.4.0=py311hcec6c5f_1
++  - pip=23.2.1=py311hecd8cb5_0
++  - pkce=1.0.3=py311hecd8cb5_0
++  - pkginfo=1.9.6=py311hecd8cb5_0
++  - platformdirs=3.10.0=py311hecd8cb5_0
++  - plotly=5.9.0=py311hecd8cb5_0
++  - pluggy=1.0.0=py311hecd8cb5_1
++  - ply=3.11=py311hecd8cb5_0
++  - poyo=0.5.0=pyhd3eb1b0_0
++  - prometheus_client=0.14.1=py311hecd8cb5_0
++  - prompt-toolkit=3.0.36=py311hecd8cb5_0
++  - prompt_toolkit=3.0.36=hd3eb1b0_0
++  - protego=0.1.16=py_0
++  - psutil=5.9.0=py311h6c40b1e_0
++  - ptyprocess=0.7.0=pyhd3eb1b0_2
++  - pure_eval=0.2.2=pyhd3eb1b0_0
++  - py-cpuinfo=8.0.0=pyhd3eb1b0_1
++  - py-lief=0.12.3=py311hcec6c5f_0
++  - pyarrow=11.0.0=py311hf41f4e6_1
++  - pyasn1=0.4.8=pyhd3eb1b0_0
++  - pyasn1-modules=0.2.8=py_0
++  - pybind11-abi=4=hd3eb1b0_1
++  - pycodestyle=2.10.0=py311hecd8cb5_0
++  - pycosat=0.6.4=py311h6c40b1e_0
++  - pycparser=2.21=pyhd3eb1b0_0
++  - pyct=0.5.0=py311hecd8cb5_0
++  - pycurl=7.45.2=py311h04015c4_1
++  - pydantic=1.10.8=py311h6c40b1e_0
++  - pydispatcher=2.0.5=py311hecd8cb5_2
++  - pydocstyle=6.3.0=py311hecd8cb5_0
++  - pyerfa=2.0.0=py311h6c40b1e_0
++  - pyflakes=3.0.1=py311hecd8cb5_0
++  - pygments=2.15.1=py311hecd8cb5_1
++  - pyjwt=2.4.0=py311hecd8cb5_0
++  - pylint=2.16.2=py311hecd8cb5_0
++  - pylint-venv=2.3.0=py311hecd8cb5_0
++  - pyls-spyder=0.4.0=pyhd3eb1b0_0
++  - pyobjc-core=9.0=py311h9205ec4_1
++  - pyobjc-framework-cocoa=9.0=py311h9205ec4_0
++  - pyobjc-framework-coreservices=9.0=py311h46256e1_0
++  - pyobjc-framework-fsevents=9.0=py311hecd8cb5_0
++  - pyodbc=4.0.34=py311hcec6c5f_0
++  - pyopenssl=23.2.0=py311hecd8cb5_0
++  - pyparsing=3.0.9=py311hecd8cb5_0
++  - pyqt=5.15.7=py311hcec6c5f_0
++  - pyqt5-sip=12.11.0=py311hcec6c5f_0
++  - pyqtwebengine=5.15.7=py311hcec6c5f_0
++  - pyrsistent=0.18.0=py311h6c40b1e_0
++  - pysocks=1.7.1=py311hecd8cb5_0
++  - pytables=3.8.0=py311h0b11676_3
++  - python=3.11.5=hf27a42d_0
++  - python-dateutil=2.8.2=pyhd3eb1b0_0
++  - python-dotenv=0.21.0=py311hecd8cb5_0
++  - python-fastjsonschema=2.16.2=py311hecd8cb5_0
++  - python-json-logger=2.0.7=py311hecd8cb5_0
++  - python-kaleido=0.2.1=py311hecd8cb5_0
++  - python-libarchive-c=2.9=pyhd3eb1b0_1
++  - python-lmdb=1.4.1=py311hcec6c5f_0
++  - python-lsp-black=1.2.1=py311hecd8cb5_0
++  - python-lsp-jsonrpc=1.0.0=pyhd3eb1b0_0
++  - python-lsp-server=1.7.2=py311hecd8cb5_0
++  - python-slugify=5.0.2=pyhd3eb1b0_0
++  - python-snappy=0.6.1=py311hcec6c5f_0
++  - python-tzdata=2023.3=pyhd3eb1b0_0
++  - python-xxhash=2.0.2=py311h6c40b1e_1
++  - python.app=3=py311h6c40b1e_0
++  - pytoolconfig=1.2.5=py311hecd8cb5_1
++  - pytz=2023.3.post1=py311hecd8cb5_0
++  - pyviz_comms=2.3.0=py311hecd8cb5_0
++  - pywavelets=1.4.1=py311h6c40b1e_0
++  - pyyaml=6.0=py311h6c40b1e_1
++  - pyzmq=23.2.0=py311hcec6c5f_0
++  - qdarkstyle=3.0.2=pyhd3eb1b0_0
++  - qstylizer=0.2.2=py311hecd8cb5_0
++  - qt-main=5.15.2=h1076e38_9
++  - qt-webengine=5.15.9=h90a370e_7
++  - qtawesome=1.2.2=py311hecd8cb5_0
++  - qtconsole=5.4.2=py311hecd8cb5_0
++  - qtpy=2.2.0=py311hecd8cb5_0
++  - qtwebkit=5.212=hbfab81c_5
++  - queuelib=1.5.0=py311hecd8cb5_0
++  - re2=2022.04.01=he9d5cce_0
++  - readline=8.2=hca72f7f_0
++  - regex=2022.7.9=py311h6c40b1e_0
++  - reproc=14.2.4=he9d5cce_1
++  - reproc-cpp=14.2.4=he9d5cce_1
++  - requests=2.31.0=py311hecd8cb5_0
++  - requests-file=1.5.1=pyhd3eb1b0_0
++  - requests-toolbelt=1.0.0=py311hecd8cb5_0
++  - responses=0.13.3=pyhd3eb1b0_0
++  - rfc3339-validator=0.1.4=py311hecd8cb5_0
++  - rfc3986-validator=0.1.1=py311hecd8cb5_0
++  - rope=1.7.0=py311hecd8cb5_0
++  - rtree=1.0.1=py311hecd8cb5_0
++  - ruamel.yaml=0.17.21=py311h6c40b1e_0
++  - ruamel_yaml=0.17.21=py311h6c40b1e_0
++  - s3fs=2023.4.0=py311hecd8cb5_0
++  - safetensors=0.3.2=py311hf2ad997_0
++  - scikit-image=0.20.0=py311hcec6c5f_0
++  - scikit-learn=1.3.0=py311hdb55bb0_0
++  - scipy=1.11.1=py311h7695dc5_0
++  - scrapy=2.8.0=py311hecd8cb5_0
++  - seaborn=0.12.2=py311hecd8cb5_0
++  - send2trash=1.8.0=pyhd3eb1b0_1
++  - service_identity=18.1.0=pyhd3eb1b0_1
++  - setuptools=68.0.0=py311hecd8cb5_0
++  - sip=6.6.2=py311hcec6c5f_0
++  - six=1.16.0=pyhd3eb1b0_1
++  - smart_open=5.2.1=py311hecd8cb5_0
++  - snappy=1.1.9=he9d5cce_0
++  - sniffio=1.2.0=py311hecd8cb5_1
++  - snowballstemmer=2.2.0=pyhd3eb1b0_0
++  - sortedcontainers=2.4.0=pyhd3eb1b0_0
++  - soupsieve=2.4=py311hecd8cb5_0
++  - sphinx=5.0.2=py311hecd8cb5_0
++  - sphinxcontrib-applehelp=1.0.2=pyhd3eb1b0_0
++  - sphinxcontrib-devhelp=1.0.2=pyhd3eb1b0_0
++  - sphinxcontrib-htmlhelp=2.0.0=pyhd3eb1b0_0
++  - sphinxcontrib-jsmath=1.0.1=pyhd3eb1b0_0
++  - sphinxcontrib-qthelp=1.0.3=pyhd3eb1b0_0
++  - sphinxcontrib-serializinghtml=1.1.5=pyhd3eb1b0_0
++  - spyder=5.4.3=py311hecd8cb5_1
++  - spyder-kernels=2.4.4=py311hecd8cb5_0
++  - sqlalchemy=1.4.39=py311h6c40b1e_0
++  - sqlite=3.41.2=h6c40b1e_0
++  - stack_data=0.2.0=pyhd3eb1b0_0
++  - statsmodels=0.14.0=py311hb3a5e46_0
++  - sympy=1.11.1=py311hecd8cb5_0
++  - tabulate=0.8.10=py311hecd8cb5_0
++  - tapi=1000.10.8=ha1b3eb9_0
++  - tbb=2021.8.0=ha357a0b_0
++  - tblib=1.7.0=pyhd3eb1b0_0
++  - tenacity=8.2.2=py311hecd8cb5_0
++  - terminado=0.17.1=py311hecd8cb5_0
++  - text-unidecode=1.3=pyhd3eb1b0_0
++  - textdistance=4.2.1=pyhd3eb1b0_0
++  - threadpoolctl=2.2.0=pyh0d69192_0
++  - three-merge=0.1.1=pyhd3eb1b0_0
++  - tifffile=2023.4.12=py311hecd8cb5_0
++  - tinycss2=1.2.1=py311hecd8cb5_0
++  - tk=8.6.12=h5d9f67b_0
++  - tldextract=3.2.0=pyhd3eb1b0_0
++  - tokenizers=0.13.2=py311h5240035_1
++  - toml=0.10.2=pyhd3eb1b0_0
++  - tomlkit=0.11.1=py311hecd8cb5_0
++  - toolz=0.12.0=py311hecd8cb5_0
++  - tornado=6.3.2=py311h6c40b1e_0
++  - tqdm=4.65.0=py311h85bffb1_0
++  - traitlets=5.7.1=py311hecd8cb5_0
++  - transformers=4.32.1=py311hecd8cb5_0
++  - twisted=22.10.0=py311h6c40b1e_0
++  - typing-extensions=4.7.1=py311hecd8cb5_0
++  - typing_extensions=4.7.1=py311hecd8cb5_0
++  - tzdata=2023c=h04d1e81_0
++  - uc-micro-py=1.0.1=py311hecd8cb5_0
++  - ujson=5.4.0=py311hcec6c5f_0
++  - unidecode=1.2.0=pyhd3eb1b0_0
++  - unixodbc=2.3.11=hb456775_0
++  - urllib3=1.26.16=py311hecd8cb5_0
++  - utf8proc=2.6.1=h9ed2024_0
++  - w3lib=1.21.0=pyhd3eb1b0_0
++  - watchdog=2.1.6=py311h3333b6a_0
++  - wcwidth=0.2.5=pyhd3eb1b0_0
++  - webencodings=0.5.1=py311hecd8cb5_1
++  - websocket-client=0.58.0=py311hecd8cb5_4
++  - werkzeug=2.2.3=py311hecd8cb5_0
++  - whatthepatch=1.0.2=py311hecd8cb5_0
++  - wheel=0.38.4=py311hecd8cb5_0
++  - widgetsnbextension=4.0.5=py311hecd8cb5_0
++  - wrapt=1.14.1=py311h6c40b1e_0
++  - wurlitzer=3.0.2=py311hecd8cb5_0
++  - xarray=2023.6.0=py311hecd8cb5_0
++  - xlwings=0.29.1=py311hecd8cb5_0
++  - xxhash=0.8.0=h9ed2024_3
++  - xyzservices=2022.9.0=py311hecd8cb5_1
++  - xz=5.4.2=h6c40b1e_0
++  - y-py=0.5.9=py311h7242b5c_0
++  - yaml=0.2.5=haf1e3a3_0
++  - yaml-cpp=0.7.0=he9d5cce_1
++  - yapf=0.31.0=pyhd3eb1b0_0
++  - yarl=1.8.1=py311h6c40b1e_0
++  - ypy-websocket=0.8.2=py311hecd8cb5_0
++  - zeromq=4.3.4=h23ab428_0
++  - zfp=1.0.0=hcec6c5f_0
++  - zict=2.2.0=py311hecd8cb5_0
++  - zipp=3.11.0=py311hecd8cb5_0
++  - zlib=1.2.13=h4dc903c_0
++  - zlib-ng=2.0.7=h6c40b1e_0
++  - zope=1.0=py311hecd8cb5_1
++  - zope.interface=5.4.0=py311h6c40b1e_0
++  - zstandard=0.19.0=py311h6c40b1e_0
++  - zstd=1.5.5=hc035e20_0
++  - pip:
++      - alembic==1.13.1
++      - athlib==0.7.8
++      - betterpath==0.2.2
++      - databricks-cli==0.18.0
++      - distlib==0.3.8
++      - docker==6.1.3
++      - docker-pycreds==0.4.0
++      - filelock==3.13.1
++      - gitdb==4.0.11
++      - gitpython==3.1.41
++      - gunicorn==21.2.0
++      - l==0.11.0
++      - mako==1.3.0
++      - mlflow==2.9.2
++      - numpy==1.23.4
++      - oauthlib==3.2.2
++      - protobuf==4.25.2
++      - pytest==7.4.4
++      - querystring-parser==1.2.4
++      - sentry-sdk==1.39.2
++      - setproctitle==1.3.3
++      - smmap==5.0.1
++      - sqlparse==0.4.4
++      - vcversioner==2.16.0.0
++      - virtualenv==20.25.0
++      - wandb==0.16.2
++prefix: /Users/ruilu/anaconda3
+diff --git a/exercise-4/wandb/run-20240116_201830-43b9bfur/files/config.yaml b/exercise-4/wandb/run-20240116_201830-43b9bfur/files/config.yaml
+new file mode 100644
+index 0000000..9a2273c
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_201830-43b9bfur/files/config.yaml
+@@ -0,0 +1,27 @@
++wandb_version: 1
++
++path:
++  desc: null
++  value: genres_mod.parquet
++_wandb:
++  desc: null
++  value:
++    python_version: 3.11.5
++    cli_version: 0.16.2
++    is_jupyter_run: false
++    is_kaggle_kernel: false
++    start_time: 1705454310.961296
++    t:
++      1:
++      - 55
++      2:
++      - 55
++      3:
++      - 2
++      - 16
++      - 23
++      4: 3.11.5
++      5: 0.16.2
++      8:
++      - 5
++      13: darwin-x86_64
+diff --git a/exercise-4/wandb/run-20240116_201830-43b9bfur/files/requirements.txt b/exercise-4/wandb/run-20240116_201830-43b9bfur/files/requirements.txt
+new file mode 100644
+index 0000000..fa485cc
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_201830-43b9bfur/files/requirements.txt
+@@ -0,0 +1,386 @@
++aiobotocore==2.5.0
++aiofiles==22.1.0
++aiohttp==3.8.5
++aioitertools==0.7.1
++aiosignal==1.2.0
++aiosqlite==0.18.0
++alabaster==0.7.12
++alembic==1.13.1
++anaconda-anon-usage==0.4.2
++anaconda-catalogs==0.2.0
++anaconda-client==1.12.1
++anaconda-cloud-auth==0.1.3
++anaconda-navigator==2.5.0
++anaconda-project==0.11.1
++anyio==3.5.0
++appdirs==1.4.4
++applaunchservices==0.3.0
++appnope==0.1.2
++appscript==1.1.2
++argon2-cffi-bindings==21.2.0
++argon2-cffi==21.3.0
++arrow==1.2.3
++astroid==2.14.2
++astropy==5.1
++asttokens==2.0.5
++async-timeout==4.0.2
++athlib==0.7.8
++atomicwrites==1.4.0
++attrs==22.1.0
++automat==20.2.0
++autopep8==1.6.0
++babel==2.11.0
++backcall==0.2.0
++backports.functools-lru-cache==1.6.4
++backports.tempfile==1.0
++backports.weakref==1.0.post1
++bcrypt==3.2.0
++beautifulsoup4==4.12.2
++betterpath==0.2.2
++binaryornot==0.4.4
++black==0.0
++bleach==4.1.0
++bokeh==3.2.1
++boltons==23.0.0
++botocore==1.29.76
++bottleneck==1.3.5
++brotlipy==0.7.0
++certifi==2023.7.22
++cffi==1.15.1
++chardet==4.0.0
++charset-normalizer==2.0.4
++click==8.0.4
++cloudpickle==2.2.1
++clyent==1.2.2
++colorama==0.4.6
++colorcet==3.0.1
++comm==0.1.2
++conda-build==3.26.1
++conda-content-trust==0.2.0
++conda-index==0.3.0
++conda-libmamba-solver==23.7.0
++conda-pack==0.6.0
++conda-package-handling==2.2.0
++conda-package-streaming==0.9.0
++conda-repo-cli==1.0.75
++conda-token==0.4.0
++conda-verify==3.4.2
++conda==23.7.4
++constantly==15.1.0
++contourpy==1.0.5
++cookiecutter==1.7.3
++cryptography==41.0.3
++cssselect==1.1.0
++cycler==0.11.0
++cytoolz==0.12.0
++dask==2023.6.0
++databricks-cli==0.18.0
++datasets==2.12.0
++datashader==0.15.2
++datashape==0.5.4
++debugpy==1.6.7
++decorator==5.1.1
++defusedxml==0.7.1
++diff-match-patch==20200713
++dill==0.3.6
++distlib==0.3.8
++distributed==2023.6.0
++docker-pycreds==0.4.0
++docker==6.1.3
++docstring-to-markdown==0.11
++docutils==0.18.1
++entrypoints==0.4
++et-xmlfile==1.1.0
++executing==0.8.3
++fastjsonschema==2.16.2
++filelock==3.13.1
++flake8==6.0.0
++flask==2.2.2
++fonttools==4.25.0
++frozenlist==1.3.3
++fsspec==2023.4.0
++future==0.18.3
++gensim==4.3.0
++gitdb==4.0.11
++gitpython==3.1.41
++glob2==0.7
++gmpy2==2.1.2
++greenlet==2.0.1
++gunicorn==21.2.0
++h5py==3.9.0
++heapdict==1.0.1
++holoviews==1.17.1
++huggingface-hub==0.15.1
++hvplot==0.8.4
++hyperlink==21.0.0
++idna==3.4
++imagecodecs==2023.1.23
++imageio==2.31.1
++imagesize==1.4.1
++imbalanced-learn==0.10.1
++importlib-metadata==6.0.0
++incremental==21.3.0
++inflection==0.5.1
++iniconfig==1.1.1
++intake==0.6.8
++intervaltree==3.1.0
++ipykernel==6.25.0
++ipython-genutils==0.2.0
++ipython==8.15.0
++ipywidgets==8.0.4
++isort==5.9.3
++itemadapter==0.3.0
++itemloaders==1.0.4
++itsdangerous==2.0.1
++jaraco.classes==3.2.1
++jedi==0.18.1
++jellyfish==1.0.1
++jinja2-time==0.2.0
++jinja2==3.1.2
++jmespath==0.10.0
++joblib==1.2.0
++json5==0.9.6
++jsonpatch==1.32
++jsonpointer==2.1
++jsonschema==4.17.3
++jupyter-client==7.4.9
++jupyter-console==6.6.3
++jupyter-core==5.3.0
++jupyter-events==0.6.3
++jupyter-server-fileid==0.9.0
++jupyter-server-ydoc==0.8.0
++jupyter-server==1.23.4
++jupyter-ydoc==0.2.4
++jupyter==1.0.0
++jupyterlab-pygments==0.1.2
++jupyterlab-server==2.22.0
++jupyterlab-widgets==3.0.5
++jupyterlab==3.6.3
++kaleido==0.2.1
++keyring==23.13.1
++kiwisolver==1.4.4
++l==0.11.0
++lazy-loader==0.2
++lazy-object-proxy==1.6.0
++libarchive-c==2.9
++libmambapy==1.5.1
++linkify-it-py==2.0.0
++llvmlite==0.40.0
++lmdb==1.4.1
++locket==1.0.0
++lxml==4.9.3
++lz4==4.3.2
++mako==1.3.0
++markdown-it-py==2.2.0
++markdown==3.4.1
++markupsafe==2.1.1
++matplotlib-inline==0.1.6
++matplotlib==3.7.2
++mccabe==0.7.0
++mdit-py-plugins==0.3.0
++mdurl==0.1.0
++mistune==0.8.4
++mlflow==2.9.2
++more-itertools==8.12.0
++mpmath==1.3.0
++msgpack==1.0.3
++multidict==6.0.2
++multipledispatch==0.6.0
++multiprocess==0.70.14
++munkres==1.1.4
++mypy-extensions==1.0.0
++navigator-updater==0.4.0
++nbclassic==0.5.5
++nbclient==0.5.13
++nbconvert==6.5.4
++nbformat==5.9.2
++nest-asyncio==1.5.6
++networkx==3.1
++nltk==3.8.1
++notebook-shim==0.2.2
++notebook==6.5.4
++numba==0.57.0
++numexpr==2.8.4
++numpy==1.23.4
++numpydoc==1.5.0
++oauthlib==3.2.2
++openpyxl==3.0.10
++packaging==23.1
++pandas==2.0.3
++pandocfilters==1.5.0
++panel==1.2.3
++param==1.13.0
++parsel==1.6.0
++parso==0.8.3
++partd==1.4.0
++pathlib==1.0.1
++pathspec==0.10.3
++patsy==0.5.3
++pep8==1.7.1
++pexpect==4.8.0
++pickleshare==0.7.5
++pillow==9.4.0
++pip==23.2.1
++pkce==1.0.3
++pkginfo==1.9.6
++platformdirs==3.10.0
++plotly==5.9.0
++pluggy==1.0.0
++ply==3.11
++poyo==0.5.0
++prometheus-client==0.14.1
++prompt-toolkit==3.0.36
++protego==0.1.16
++protobuf==4.25.2
++psutil==5.9.0
++ptyprocess==0.7.0
++pure-eval==0.2.2
++py-cpuinfo==8.0.0
++pyarrow==11.0.0
++pyasn1-modules==0.2.8
++pyasn1==0.4.8
++pycodestyle==2.10.0
++pycosat==0.6.4
++pycparser==2.21
++pyct==0.5.0
++pycurl==7.45.2
++pydantic==1.10.8
++pydispatcher==2.0.5
++pydocstyle==6.3.0
++pyerfa==2.0.0
++pyflakes==3.0.1
++pygments==2.15.1
++pyjwt==2.4.0
++pylint-venv==2.3.0
++pylint==2.16.2
++pyls-spyder==0.4.0
++pyobjc-core==9.0
++pyobjc-framework-cocoa==9.0
++pyobjc-framework-coreservices==9.0
++pyobjc-framework-fsevents==9.0
++pyodbc==4.0.34
++pyopenssl==23.2.0
++pyparsing==3.0.9
++pyqt5-sip==12.11.0
++pyrsistent==0.18.0
++pysocks==1.7.1
++pytest==7.4.4
++python-dateutil==2.8.2
++python-dotenv==0.21.0
++python-json-logger==2.0.7
++python-lsp-black==1.2.1
++python-lsp-jsonrpc==1.0.0
++python-lsp-server==1.7.2
++python-slugify==5.0.2
++python-snappy==0.6.1
++pytoolconfig==1.2.5
++pytz==2023.3.post1
++pyviz-comms==2.3.0
++pywavelets==1.4.1
++pyyaml==6.0
++pyzmq==23.2.0
++qdarkstyle==3.0.2
++qstylizer==0.2.2
++qtawesome==1.2.2
++qtconsole==5.4.2
++qtpy==2.2.0
++querystring-parser==1.2.4
++queuelib==1.5.0
++regex==2022.7.9
++requests-file==1.5.1
++requests-toolbelt==1.0.0
++requests==2.31.0
++responses==0.13.3
++rfc3339-validator==0.1.4
++rfc3986-validator==0.1.1
++rope==1.7.0
++rtree==1.0.1
++ruamel-yaml-conda==0.17.21
++ruamel.yaml==0.17.21
++s3fs==2023.4.0
++safetensors==0.3.2
++scikit-image==0.20.0
++scikit-learn==1.3.0
++scipy==1.11.1
++scrapy==2.8.0
++seaborn==0.12.2
++send2trash==1.8.0
++sentry-sdk==1.39.2
++service-identity==18.1.0
++setproctitle==1.3.3
++setuptools==68.0.0
++sip==6.6.2
++six==1.16.0
++smart-open==5.2.1
++smmap==5.0.1
++sniffio==1.2.0
++snowballstemmer==2.2.0
++sortedcontainers==2.4.0
++soupsieve==2.4
++sphinx==5.0.2
++sphinxcontrib-applehelp==1.0.2
++sphinxcontrib-devhelp==1.0.2
++sphinxcontrib-htmlhelp==2.0.0
++sphinxcontrib-jsmath==1.0.1
++sphinxcontrib-qthelp==1.0.3
++sphinxcontrib-serializinghtml==1.1.5
++spyder-kernels==2.4.4
++spyder==5.4.3
++sqlalchemy==1.4.39
++sqlparse==0.4.4
++stack-data==0.2.0
++statsmodels==0.14.0
++sympy==1.11.1
++tables==3.8.0
++tabulate==0.8.10
++tblib==1.7.0
++tenacity==8.2.2
++terminado==0.17.1
++text-unidecode==1.3
++textdistance==4.2.1
++threadpoolctl==2.2.0
++three-merge==0.1.1
++tifffile==2023.4.12
++tinycss2==1.2.1
++tldextract==3.2.0
++tokenizers==0.13.2
++toml==0.10.2
++tomlkit==0.11.1
++toolz==0.12.0
++tornado==6.3.2
++tqdm==4.65.0
++traitlets==5.7.1
++transformers==4.32.1
++twisted==22.10.0
++typing-extensions==4.7.1
++tzdata==2023.3
++uc-micro-py==1.0.1
++ujson==5.4.0
++unidecode==1.2.0
++urllib3==1.26.16
++vcversioner==2.16.0.0
++virtualenv==20.25.0
++w3lib==1.21.0
++wandb==0.16.2
++watchdog==2.1.6
++wcwidth==0.2.5
++webencodings==0.5.1
++websocket-client==0.58.0
++werkzeug==2.2.3
++whatthepatch==1.0.2
++wheel==0.38.4
++widgetsnbextension==4.0.5
++wrapt==1.14.1
++wurlitzer==3.0.2
++xarray==2023.6.0
++xlwings==0.29.1
++xxhash==2.0.2
++xyzservices==2022.9.0
++y-py==0.5.9
++yapf==0.31.0
++yarl==1.8.1
++ypy-websocket==0.8.2
++zict==2.2.0
++zipp==3.11.0
++zope.interface==5.4.0
++zstandard==0.19.0
+\ No newline at end of file
+diff --git a/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-metadata.json b/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-metadata.json
+new file mode 100644
+index 0000000..56885c0
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-metadata.json
+@@ -0,0 +1,54 @@
++{
++    "os": "macOS-10.16-x86_64-i386-64bit",
++    "python": "3.11.5",
++    "heartbeatAt": "2024-01-17T01:18:31.676657",
++    "startedAt": "2024-01-17T01:18:30.954616",
++    "docker": null,
++    "cuda": null,
++    "args": [
++        "artifact",
++        "put",
++        "--name",
++        "exercise_4/genres_mod.parquet",
++        "--type",
++        "raw_data",
++        "--description",
++        "A modified version of the songs dataset",
++        "genres_mod.parquet"
++    ],
++    "state": "running",
++    "program": "/Users/ruilu/anaconda3/bin/wandb",
++    "codePathLocal": null,
++    "git": {
++        "remote": "https://github.com/lurui87/udacity_repo.git",
++        "commit": "59980f519aec8e14cae91f2eb07079a3d206329f"
++    },
++    "email": "lurui0421@gmail.com",
++    "root": "/Users/ruilu/udacity_repo",
++    "host": "Ruis-MBP.lan",
++    "username": "ruilu",
++    "executable": "/Users/ruilu/anaconda3/bin/python",
++    "cpu_count": 8,
++    "cpu_count_logical": 8,
++    "cpu_freq": {
++        "current": 2400,
++        "min": 2400,
++        "max": 2400
++    },
++    "cpu_freq_per_core": [
++        {
++            "current": 2400,
++            "min": 2400,
++            "max": 2400
++        }
++    ],
++    "disk": {
++        "/": {
++            "total": 460.4317207336426,
++            "used": 124.28336715698242
++        }
++    },
++    "memory": {
++        "total": 16.0
++    }
++}
+diff --git a/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-summary.json b/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-summary.json
+new file mode 100644
+index 0000000..b1d4cf9
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-summary.json
+@@ -0,0 +1 @@
++{"_wandb": {"runtime": 4}}
+\ No newline at end of file
+diff --git a/exercise-4/wandb/run-20240116_201830-43b9bfur/logs/debug-internal.log b/exercise-4/wandb/run-20240116_201830-43b9bfur/logs/debug-internal.log
+new file mode 100644
+index 0000000..c136154
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_201830-43b9bfur/logs/debug-internal.log
+@@ -0,0 +1,178 @@
++2024-01-16 20:18:30,962 INFO    StreamThr :55501 [internal.py:wandb_internal():86] W&B internal server running at pid: 55501, started at: 2024-01-16 20:18:30.961612
++2024-01-16 20:18:30,964 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: status
++2024-01-16 20:18:30,966 INFO    WriterThread:55501 [datastore.py:open_for_write():87] open: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/run-43b9bfur.wandb
++2024-01-16 20:18:30,966 DEBUG   SenderThread:55501 [sender.py:send():382] send: header
++2024-01-16 20:18:30,995 DEBUG   SenderThread:55501 [sender.py:send():382] send: run
++2024-01-16 20:18:31,503 INFO    SenderThread:55501 [dir_watcher.py:__init__():211] watching files in: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files
++2024-01-16 20:18:31,503 INFO    SenderThread:55501 [sender.py:_start_run_threads():1136] run started: 43b9bfur with start time 1705454310.961296
++2024-01-16 20:18:31,511 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: check_version
++2024-01-16 20:18:31,511 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: check_version
++2024-01-16 20:18:31,654 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: run_start
++2024-01-16 20:18:31,675 DEBUG   HandlerThread:55501 [system_info.py:__init__():27] System info init
++2024-01-16 20:18:31,675 DEBUG   HandlerThread:55501 [system_info.py:__init__():42] System info init done
++2024-01-16 20:18:31,675 INFO    HandlerThread:55501 [system_monitor.py:start():194] Starting system monitor
++2024-01-16 20:18:31,675 INFO    SystemMonitor:55501 [system_monitor.py:_start():158] Starting system asset monitoring threads
++2024-01-16 20:18:31,676 INFO    HandlerThread:55501 [system_monitor.py:probe():214] Collecting system info
++2024-01-16 20:18:31,676 DEBUG   HandlerThread:55501 [system_info.py:probe():151] Probing system
++2024-01-16 20:18:31,677 INFO    SystemMonitor:55501 [interfaces.py:start():190] Started cpu monitoring
++2024-01-16 20:18:31,677 INFO    SystemMonitor:55501 [interfaces.py:start():190] Started disk monitoring
++2024-01-16 20:18:31,679 INFO    SystemMonitor:55501 [interfaces.py:start():190] Started memory monitoring
++2024-01-16 20:18:31,688 INFO    SystemMonitor:55501 [interfaces.py:start():190] Started network monitoring
++2024-01-16 20:18:31,696 DEBUG   HandlerThread:55501 [system_info.py:_probe_git():136] Probing git
++2024-01-16 20:18:31,748 DEBUG   HandlerThread:55501 [system_info.py:_probe_git():144] Probing git done
++2024-01-16 20:18:31,749 DEBUG   HandlerThread:55501 [system_info.py:probe():199] Probing system done
++2024-01-16 20:18:31,749 DEBUG   HandlerThread:55501 [system_monitor.py:probe():223] {'os': 'macOS-10.16-x86_64-i386-64bit', 'python': '3.11.5', 'heartbeatAt': '2024-01-17T01:18:31.676657', 'startedAt': '2024-01-17T01:18:30.954616', 'docker': None, 'cuda': None, 'args': ('artifact', 'put', '--name', 'exercise_4/genres_mod.parquet', '--type', 'raw_data', '--description', 'A modified version of the songs dataset', 'genres_mod.parquet'), 'state': 'running', 'program': '/Users/ruilu/anaconda3/bin/wandb', 'codePathLocal': None, 'git': {'remote': 'https://github.com/lurui87/udacity_repo.git', 'commit': '59980f519aec8e14cae91f2eb07079a3d206329f'}, 'email': 'lurui0421@gmail.com', 'root': '/Users/ruilu/udacity_repo', 'host': 'Ruis-MBP.lan', 'username': 'ruilu', 'executable': '/Users/ruilu/anaconda3/bin/python', 'cpu_count': 8, 'cpu_count_logical': 8, 'cpu_freq': {'current': 2400, 'min': 2400, 'max': 2400}, 'cpu_freq_per_core': [{'current': 2400, 'min': 2400, 'max': 2400}], 'disk': {'/': {'total': 460.4317207336426, 'used': 124.28336715698242}}, 'memory': {'total': 16.0}}
++2024-01-16 20:18:31,749 INFO    HandlerThread:55501 [system_monitor.py:probe():224] Finished collecting system info
++2024-01-16 20:18:31,749 INFO    HandlerThread:55501 [system_monitor.py:probe():227] Publishing system info
++2024-01-16 20:18:31,749 DEBUG   HandlerThread:55501 [system_info.py:_save_conda():208] Saving list of conda packages installed into the current environment
++2024-01-16 20:18:32,509 INFO    Thread-12 :55501 [dir_watcher.py:_on_file_created():271] file/dir created: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/conda-environment.yaml
++2024-01-16 20:18:35,921 DEBUG   HandlerThread:55501 [system_info.py:_save_conda():220] Saving conda packages done
++2024-01-16 20:18:35,921 INFO    HandlerThread:55501 [system_monitor.py:probe():229] Finished publishing system info
++2024-01-16 20:18:35,925 DEBUG   SenderThread:55501 [sender.py:send():382] send: files
++2024-01-16 20:18:35,925 INFO    SenderThread:55501 [sender.py:_save_file():1403] saving file wandb-metadata.json with policy now
++2024-01-16 20:18:35,929 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: python_packages
++2024-01-16 20:18:35,929 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: python_packages
++2024-01-16 20:18:35,930 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: stop_status
++2024-01-16 20:18:35,930 DEBUG   SenderThread:55501 [sender.py:send():382] send: telemetry
++2024-01-16 20:18:35,931 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: internal_messages
++2024-01-16 20:18:35,931 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: stop_status
++2024-01-16 20:18:36,193 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: log_artifact
++2024-01-16 20:18:36,238 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: log_artifact
++2024-01-16 20:18:36,239 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: status_report
++2024-01-16 20:18:36,531 INFO    Thread-12 :55501 [dir_watcher.py:_on_file_modified():288] file/dir modified: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/conda-environment.yaml
++2024-01-16 20:18:36,532 INFO    Thread-12 :55501 [dir_watcher.py:_on_file_created():271] file/dir created: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-metadata.json
++2024-01-16 20:18:36,533 INFO    Thread-12 :55501 [dir_watcher.py:_on_file_created():271] file/dir created: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/requirements.txt
++2024-01-16 20:18:36,598 INFO    SenderThread:55501 [sender.py:send_request_log_artifact():1470] logged artifact genres_mod.parquet - {'id': 'QXJ0aWZhY3Q6NjkzMDg3OTYx', 'state': 'COMMITTED', 'artifactSequence': {'id': 'QXJ0aWZhY3RDb2xsZWN0aW9uOjEzMDk3OTg4NQ==', 'latestArtifact': {'id': 'QXJ0aWZhY3Q6NjkzMDg3OTYx', 'versionIndex': 0}}}
++2024-01-16 20:18:36,598 DEBUG   SenderThread:55501 [sender.py:send():382] send: telemetry
++2024-01-16 20:18:36,599 DEBUG   SenderThread:55501 [sender.py:send():382] send: exit
++2024-01-16 20:18:36,599 INFO    SenderThread:55501 [sender.py:send_exit():589] handling exit code: 0
++2024-01-16 20:18:36,599 INFO    SenderThread:55501 [sender.py:send_exit():591] handling runtime: 4
++2024-01-16 20:18:36,600 INFO    SenderThread:55501 [sender.py:_save_file():1403] saving file wandb-summary.json with policy end
++2024-01-16 20:18:36,601 INFO    SenderThread:55501 [sender.py:send_exit():597] send defer
++2024-01-16 20:18:36,601 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:36,601 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 0
++2024-01-16 20:18:36,601 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:36,601 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 0
++2024-01-16 20:18:36,601 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 1
++2024-01-16 20:18:36,601 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:36,601 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 1
++2024-01-16 20:18:36,602 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:36,602 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 1
++2024-01-16 20:18:36,602 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 2
++2024-01-16 20:18:36,602 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:36,602 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 2
++2024-01-16 20:18:36,602 INFO    HandlerThread:55501 [system_monitor.py:finish():203] Stopping system monitor
++2024-01-16 20:18:36,603 DEBUG   SystemMonitor:55501 [system_monitor.py:_start():172] Starting system metrics aggregation loop
++2024-01-16 20:18:36,603 DEBUG   SystemMonitor:55501 [system_monitor.py:_start():179] Finished system metrics aggregation loop
++2024-01-16 20:18:36,603 DEBUG   SystemMonitor:55501 [system_monitor.py:_start():183] Publishing last batch of metrics
++2024-01-16 20:18:36,603 INFO    HandlerThread:55501 [interfaces.py:finish():202] Joined cpu monitor
++2024-01-16 20:18:36,603 INFO    HandlerThread:55501 [interfaces.py:finish():202] Joined disk monitor
++2024-01-16 20:18:36,603 INFO    HandlerThread:55501 [interfaces.py:finish():202] Joined memory monitor
++2024-01-16 20:18:36,603 INFO    HandlerThread:55501 [interfaces.py:finish():202] Joined network monitor
++2024-01-16 20:18:36,604 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:36,604 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 2
++2024-01-16 20:18:36,604 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 3
++2024-01-16 20:18:36,604 DEBUG   SenderThread:55501 [sender.py:send():382] send: stats
++2024-01-16 20:18:36,604 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:36,604 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 3
++2024-01-16 20:18:36,604 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:36,604 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 3
++2024-01-16 20:18:36,604 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 4
++2024-01-16 20:18:36,605 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:36,605 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 4
++2024-01-16 20:18:36,605 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:36,605 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 4
++2024-01-16 20:18:36,605 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 5
++2024-01-16 20:18:36,605 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:36,605 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 5
++2024-01-16 20:18:36,605 DEBUG   SenderThread:55501 [sender.py:send():382] send: summary
++2024-01-16 20:18:36,605 INFO    SenderThread:55501 [sender.py:_save_file():1403] saving file wandb-summary.json with policy end
++2024-01-16 20:18:36,605 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:36,605 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 5
++2024-01-16 20:18:36,605 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 6
++2024-01-16 20:18:36,605 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:36,605 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 6
++2024-01-16 20:18:36,605 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:36,605 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 6
++2024-01-16 20:18:36,607 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: status_report
++2024-01-16 20:18:36,702 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 7
++2024-01-16 20:18:36,702 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:36,702 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 7
++2024-01-16 20:18:36,702 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:36,702 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 7
++2024-01-16 20:18:36,702 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 8
++2024-01-16 20:18:36,702 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:36,702 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 8
++2024-01-16 20:18:36,702 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:36,702 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 8
++2024-01-16 20:18:36,702 INFO    SenderThread:55501 [job_builder.py:build():296] Attempting to build job artifact
++2024-01-16 20:18:36,702 INFO    SenderThread:55501 [job_builder.py:_get_source_type():426] is repo sourced job
++2024-01-16 20:18:36,703 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 9
++2024-01-16 20:18:36,703 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:36,703 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 9
++2024-01-16 20:18:36,703 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:36,703 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 9
++2024-01-16 20:18:36,703 INFO    SenderThread:55501 [dir_watcher.py:finish():358] shutting down directory watcher
++2024-01-16 20:18:36,728 INFO    wandb-upload_0:55501 [upload_job.py:push():131] Uploaded file /var/folders/lw/t_p8zf6s1x76k2_3lv9ndhw40000gn/T/tmpm_mwwty6wandb/ooc8ypvq-wandb-metadata.json
++2024-01-16 20:18:37,200 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: poll_exit
++2024-01-16 20:18:37,540 INFO    SenderThread:55501 [dir_watcher.py:_on_file_modified():288] file/dir modified: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/config.yaml
++2024-01-16 20:18:37,540 INFO    SenderThread:55501 [dir_watcher.py:_on_file_created():271] file/dir created: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-summary.json
++2024-01-16 20:18:37,540 INFO    SenderThread:55501 [dir_watcher.py:finish():388] scan: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files
++2024-01-16 20:18:37,540 INFO    SenderThread:55501 [dir_watcher.py:finish():402] scan save: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/requirements.txt requirements.txt
++2024-01-16 20:18:37,540 INFO    SenderThread:55501 [dir_watcher.py:finish():402] scan save: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/config.yaml config.yaml
++2024-01-16 20:18:37,541 INFO    SenderThread:55501 [dir_watcher.py:finish():402] scan save: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-summary.json wandb-summary.json
++2024-01-16 20:18:37,542 INFO    SenderThread:55501 [dir_watcher.py:finish():402] scan save: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/conda-environment.yaml conda-environment.yaml
++2024-01-16 20:18:37,542 INFO    SenderThread:55501 [dir_watcher.py:finish():402] scan save: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-metadata.json wandb-metadata.json
++2024-01-16 20:18:37,542 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 10
++2024-01-16 20:18:37,542 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: poll_exit
++2024-01-16 20:18:37,542 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:37,542 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 10
++2024-01-16 20:18:37,542 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:37,542 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 10
++2024-01-16 20:18:37,543 INFO    SenderThread:55501 [file_pusher.py:finish():175] shutting down file pusher
++2024-01-16 20:18:37,875 INFO    wandb-upload_2:55501 [upload_job.py:push():131] Uploaded file /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/wandb-summary.json
++2024-01-16 20:18:38,057 INFO    wandb-upload_0:55501 [upload_job.py:push():131] Uploaded file /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/requirements.txt
++2024-01-16 20:18:38,205 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: poll_exit
++2024-01-16 20:18:38,205 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: poll_exit
++2024-01-16 20:18:38,218 INFO    wandb-upload_3:55501 [upload_job.py:push():131] Uploaded file /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/conda-environment.yaml
++2024-01-16 20:18:38,218 INFO    wandb-upload_1:55501 [upload_job.py:push():131] Uploaded file /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/files/config.yaml
++2024-01-16 20:18:38,423 INFO    Thread-11 (_thread_body):55501 [sender.py:transition_state():617] send defer: 11
++2024-01-16 20:18:38,428 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:38,428 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 11
++2024-01-16 20:18:38,428 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:38,428 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 11
++2024-01-16 20:18:38,429 INFO    SenderThread:55501 [file_pusher.py:join():181] waiting for file pusher
++2024-01-16 20:18:38,429 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 12
++2024-01-16 20:18:38,429 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:38,429 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 12
++2024-01-16 20:18:38,429 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:38,429 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 12
++2024-01-16 20:18:38,429 INFO    SenderThread:55501 [file_stream.py:finish():595] file stream finish called
++2024-01-16 20:18:38,729 INFO    SenderThread:55501 [file_stream.py:finish():599] file stream finish is done
++2024-01-16 20:18:38,729 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 13
++2024-01-16 20:18:38,729 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:38,729 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 13
++2024-01-16 20:18:38,730 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:38,730 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 13
++2024-01-16 20:18:38,730 INFO    SenderThread:55501 [sender.py:transition_state():617] send defer: 14
++2024-01-16 20:18:38,731 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: defer
++2024-01-16 20:18:38,731 DEBUG   SenderThread:55501 [sender.py:send():382] send: final
++2024-01-16 20:18:38,731 INFO    HandlerThread:55501 [handler.py:handle_request_defer():172] handle defer: 14
++2024-01-16 20:18:38,731 DEBUG   SenderThread:55501 [sender.py:send():382] send: footer
++2024-01-16 20:18:38,732 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: defer
++2024-01-16 20:18:38,732 INFO    SenderThread:55501 [sender.py:send_request_defer():613] handle sender defer: 14
++2024-01-16 20:18:38,733 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: poll_exit
++2024-01-16 20:18:38,733 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: poll_exit
++2024-01-16 20:18:38,734 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: internal_messages
++2024-01-16 20:18:38,734 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: server_info
++2024-01-16 20:18:38,734 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: get_summary
++2024-01-16 20:18:38,735 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: server_info
++2024-01-16 20:18:38,736 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: sampled_history
++2024-01-16 20:18:38,736 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: job_info
++2024-01-16 20:18:38,831 DEBUG   SenderThread:55501 [sender.py:send_request():409] send_request: job_info
++2024-01-16 20:18:38,833 DEBUG   HandlerThread:55501 [handler.py:handle_request():146] handle_request: shutdown
++2024-01-16 20:18:38,833 INFO    HandlerThread:55501 [handler.py:finish():869] shutting down handler
++2024-01-16 20:18:39,741 INFO    WriterThread:55501 [datastore.py:close():296] close: /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/run-43b9bfur.wandb
++2024-01-16 20:18:39,835 INFO    SenderThread:55501 [sender.py:finish():1572] shutting down sender
++2024-01-16 20:18:39,836 INFO    SenderThread:55501 [file_pusher.py:finish():175] shutting down file pusher
++2024-01-16 20:18:39,836 INFO    SenderThread:55501 [file_pusher.py:join():181] waiting for file pusher
+diff --git a/exercise-4/wandb/run-20240116_201830-43b9bfur/logs/debug.log b/exercise-4/wandb/run-20240116_201830-43b9bfur/logs/debug.log
+new file mode 100644
+index 0000000..ecccabc
+--- /dev/null
++++ b/exercise-4/wandb/run-20240116_201830-43b9bfur/logs/debug.log
+@@ -0,0 +1,34 @@
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_setup.py:_flush():76] Current SDK version is 0.16.2
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_setup.py:_flush():76] Configure stats pid to 55492
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_setup.py:_flush():76] Loading settings from /Users/ruilu/.config/wandb/settings
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_setup.py:_flush():76] Loading settings from /Users/ruilu/udacity_repo/exercise-4/wandb/settings
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_setup.py:_flush():76] Loading settings from environment variables: {'entity': 'ruilu', 'project': 'exercise_4'}
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_setup.py:_flush():76] Applying setup settings: {'_disable_service': False}
++2024-01-16 20:18:30,956 WARNING MainThread:55492 [wandb_setup.py:_flush():76] Could not save program above cwd: /Users/ruilu/anaconda3/bin/wandb
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_setup.py:_flush():76] Inferring run settings from compute environment: {'program_relpath': None, 'program_abspath': '/Users/ruilu/anaconda3/bin/wandb', 'program': '/Users/ruilu/anaconda3/bin/wandb'}
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_init.py:_log_setup():526] Logging user logs to /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/logs/debug.log
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_init.py:_log_setup():527] Logging internal logs to /Users/ruilu/udacity_repo/exercise-4/wandb/run-20240116_201830-43b9bfur/logs/debug-internal.log
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_init.py:init():566] calling init triggers
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_init.py:init():573] wandb.init called with sweep_config: {}
++config: {'path': 'genres_mod.parquet'}
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_init.py:init():616] starting backend
++2024-01-16 20:18:30,956 INFO    MainThread:55492 [wandb_init.py:init():620] setting up manager
++2024-01-16 20:18:30,960 INFO    MainThread:55492 [backend.py:_multiprocessing_setup():105] multiprocessing start_methods=spawn,fork,forkserver, using: spawn
++2024-01-16 20:18:30,961 INFO    MainThread:55492 [wandb_init.py:init():628] backend started and connected
++2024-01-16 20:18:30,965 INFO    MainThread:55492 [wandb_init.py:init():720] updated telemetry
++2024-01-16 20:18:30,994 INFO    MainThread:55492 [wandb_init.py:init():753] communicating run to backend with 90.0 second timeout
++2024-01-16 20:18:31,510 INFO    MainThread:55492 [wandb_run.py:_on_init():2254] communicating current version
++2024-01-16 20:18:31,651 INFO    MainThread:55492 [wandb_run.py:_on_init():2263] got version response 
++2024-01-16 20:18:31,651 INFO    MainThread:55492 [wandb_init.py:init():804] starting run threads in backend
++2024-01-16 20:18:35,929 INFO    MainThread:55492 [wandb_run.py:_console_start():2233] atexit reg
++2024-01-16 20:18:35,929 INFO    MainThread:55492 [wandb_run.py:_redirect():2088] redirect: wrap_raw
++2024-01-16 20:18:35,929 INFO    MainThread:55492 [wandb_run.py:_redirect():2153] Wrapping output streams.
++2024-01-16 20:18:35,929 INFO    MainThread:55492 [wandb_run.py:_redirect():2178] Redirects installed.
++2024-01-16 20:18:35,930 INFO    MainThread:55492 [wandb_init.py:init():847] run started, returning control to user process
++2024-01-16 20:18:36,193 INFO    MainThread:55492 [wandb_run.py:_finish():1962] finishing run ruilu/exercise_4/43b9bfur
++2024-01-16 20:18:36,193 INFO    MainThread:55492 [wandb_run.py:_atexit_cleanup():2202] got exitcode: 0
++2024-01-16 20:18:36,194 INFO    MainThread:55492 [wandb_run.py:_restore():2185] restore
++2024-01-16 20:18:36,194 INFO    MainThread:55492 [wandb_run.py:_restore():2191] restore done
++2024-01-16 20:18:39,834 INFO    MainThread:55492 [wandb_run.py:_footer_history_summary_info():3857] rendering history
++2024-01-16 20:18:39,834 INFO    MainThread:55492 [wandb_run.py:_footer_history_summary_info():3889] rendering summary
++2024-01-16 20:18:39,838 INFO    MainThread:55492 [wandb_run.py:_footer_sync_info():3816] logging synced files
+diff --git a/exercise-4/wandb/run-20240116_201830-43b9bfur/run-43b9bfur.wandb b/exercise-4/wandb/run-20240116_201830-43b9bfur/run-43b9bfur.wandb
+new file mode 100644
+index 0000000..509dca3
+Binary files /dev/null and b/exercise-4/wandb/run-20240116_201830-43b9bfur/run-43b9bfur.wandb differ
