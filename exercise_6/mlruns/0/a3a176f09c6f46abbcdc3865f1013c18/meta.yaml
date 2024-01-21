@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_6/mlruns/0/a3a176f09c6f46abbcdc3865f1013c18/artifacts
+end_time: 1705873288847
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: a3a176f09c6f46abbcdc3865f1013c18
+run_name: handsome-horse-680
+run_uuid: a3a176f09c6f46abbcdc3865f1013c18
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705873285671
+status: 4
+tags: []
+user_id: ruilu

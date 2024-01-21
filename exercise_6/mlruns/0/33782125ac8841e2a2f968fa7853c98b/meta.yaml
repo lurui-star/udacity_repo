@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_6/mlruns/0/33782125ac8841e2a2f968fa7853c98b/artifacts
+end_time: 1705872356697
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 33782125ac8841e2a2f968fa7853c98b
+run_name: wise-dolphin-43
+run_uuid: 33782125ac8841e2a2f968fa7853c98b
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705872292549
+status: 4
+tags: []
+user_id: ruilu

@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_6/mlruns/0/c7be5ef9d0cc48969f56b3fa5928c637/artifacts
+end_time: 1705873540864
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: c7be5ef9d0cc48969f56b3fa5928c637
+run_name: gregarious-moose-384
+run_uuid: c7be5ef9d0cc48969f56b3fa5928c637
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705873530667
+status: 4
+tags: []
+user_id: ruilu

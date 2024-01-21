@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_6/mlruns/0/e462736d04aa4b9dbabb6991e1815363/artifacts
+end_time: 1705873459898
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: e462736d04aa4b9dbabb6991e1815363
+run_name: glamorous-hog-519
+run_uuid: e462736d04aa4b9dbabb6991e1815363
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705873381456
+status: 4
+tags: []
+user_id: ruilu
