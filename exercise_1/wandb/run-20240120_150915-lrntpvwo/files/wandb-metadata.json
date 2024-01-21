@@ -1,0 +1,48 @@
+{
+    "os": "macOS-10.16-x86_64-i386-64bit",
+    "python": "3.11.5",
+    "heartbeatAt": "2024-01-20T20:09:16.485620",
+    "startedAt": "2024-01-20T20:09:15.710936",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        "--artifact_name",
+        "exercise_1/zen_of_python:v1"
+    ],
+    "state": "running",
+    "program": "/Users/ruilu/udacity_repo/exercise_1/use_artifact.py",
+    "codePathLocal": "use_artifact.py",
+    "codePath": "exercise_1/use_artifact.py",
+    "git": {
+        "remote": "https://github.com/lurui87/udacity_repo.git",
+        "commit": "fa1553dd3df11cbfe977f0d4071a9bc9e9b07601"
+    },
+    "email": "lurui0421@gmail.com",
+    "root": "/Users/ruilu/udacity_repo",
+    "host": "Ruis-MBP.lan",
+    "username": "ruilu",
+    "executable": "/Users/ruilu/anaconda3/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 2400,
+        "min": 2400,
+        "max": 2400
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2400,
+            "min": 2400,
+            "max": 2400
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 460.4317207336426,
+            "used": 128.97649383544922
+        }
+    },
+    "memory": {
+        "total": 16.0
+    }
+}

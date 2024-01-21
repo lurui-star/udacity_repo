@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/0268289f20a342d994700e4229074928/artifacts
+end_time: 1705785117557
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 0268289f20a342d994700e4229074928
+run_name: orderly-sheep-663
+run_uuid: 0268289f20a342d994700e4229074928
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705785115925
+status: 4
+tags: []
+user_id: ruilu
