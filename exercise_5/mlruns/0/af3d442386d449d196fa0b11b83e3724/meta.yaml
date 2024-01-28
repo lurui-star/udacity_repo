@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/af3d442386d449d196fa0b11b83e3724/artifacts
+end_time: 1705870677952
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: af3d442386d449d196fa0b11b83e3724
+run_name: powerful-goose-240
+run_uuid: af3d442386d449d196fa0b11b83e3724
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705870669440
+status: 4
+tags: []
+user_id: ruilu

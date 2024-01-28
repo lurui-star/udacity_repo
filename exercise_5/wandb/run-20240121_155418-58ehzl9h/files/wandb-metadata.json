@@ -1,0 +1,44 @@
+{
+    "os": "macOS-10.16-x86_64-i386-64bit",
+    "python": "3.11.5",
+    "heartbeatAt": "2024-01-21T20:54:19.100580",
+    "startedAt": "2024-01-21T20:54:18.433951",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "Debug_error.ipynb",
+    "codePathLocal": "Debug_error.ipynb",
+    "root": "/Users/ruilu/udacity_repo",
+    "git": {
+        "remote": "https://github.com/lurui87/udacity_repo.git",
+        "commit": "bdd8acc9e35c98ff697b7bfb31ed0be3fe43ef31"
+    },
+    "email": "lurui0421@gmail.com",
+    "host": "Ruis-MBP.lan",
+    "username": "ruilu",
+    "executable": "/Users/ruilu/anaconda3/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 2400,
+        "min": 2400,
+        "max": 2400
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2400,
+            "min": 2400,
+            "max": 2400
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 460.4317207336426,
+            "used": 130.0153694152832
+        }
+    },
+    "memory": {
+        "total": 16.0
+    }
+}

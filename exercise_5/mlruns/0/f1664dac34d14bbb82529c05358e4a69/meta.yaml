@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/f1664dac34d14bbb82529c05358e4a69/artifacts
+end_time: 1705867253749
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: f1664dac34d14bbb82529c05358e4a69
+run_name: unequaled-goose-772
+run_uuid: f1664dac34d14bbb82529c05358e4a69
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705867190357
+status: 4
+tags: []
+user_id: ruilu

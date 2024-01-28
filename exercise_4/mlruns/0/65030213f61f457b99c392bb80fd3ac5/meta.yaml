@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/65030213f61f457b99c392bb80fd3ac5/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 65030213f61f457b99c392bb80fd3ac5
+run_name: mysterious-panda-776
+run_uuid: 65030213f61f457b99c392bb80fd3ac5
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705863758608
+status: 1
+tags: []
+user_id: ruilu

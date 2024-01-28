@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-3/mlruns/0/72f57c74a5f5496ea6a15235b94b6b1a/artifacts
+end_time: 1705450526137
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 72f57c74a5f5496ea6a15235b94b6b1a
+run_name: righteous-shrew-446
+run_uuid: 72f57c74a5f5496ea6a15235b94b6b1a
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705450093254
+status: 4
+tags: []
+user_id: ruilu

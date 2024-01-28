@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/f64f420b498c445ba9d045dad186c0ea/artifacts
+end_time: 1705868156617
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: f64f420b498c445ba9d045dad186c0ea
+run_name: beautiful-mule-249
+run_uuid: f64f420b498c445ba9d045dad186c0ea
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705868148630
+status: 4
+tags: []
+user_id: ruilu

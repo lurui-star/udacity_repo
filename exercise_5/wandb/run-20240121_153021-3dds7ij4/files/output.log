@@ -1,0 +1,38 @@
+2024-01-21 15:30:22,585 Downloading artifact
+wandb: ERROR Project  ruilu/exercise_4 does not contain artifact: "genres_mod.parquet:latest
+wandb: ERROR "
+Traceback (most recent call last):
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/wandb/apis/normalize.py", line 24, in wrapper
+    return func(*args, **kwargs)
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/wandb/apis/public.py", line 520, in artifact
+    artifact = Artifact(self.client, entity, project, artifact_name)
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/wandb/apis/public.py", line 2583, in __init__
+    self._load()
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/wandb/apis/public.py", line 3097, in _load
+    raise ValueError(
+ValueError: Project  ruilu/exercise_4 does not contain artifact: "genres_mod.parquet:latest
+"
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/ruilu/udacity_repo/exercise_5/run.py", line 82, in <module>
+    go(args)
+  File "/Users/ruilu/udacity_repo/exercise_5/run.py", line 19, in go
+    artifact = run.use_artifact(args.input_artifact)
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/wandb/sdk/wandb_run.py", line 1957, in use_artifact
+    artifact = public_api.artifact(type=type, name=name)
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/wandb/apis/normalize.py", line 62, in wrapper
+    six.reraise(CommError, CommError(message, err), sys.exc_info()[2])
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/six.py", line 718, in reraise
+    raise value.with_traceback(tb)
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/wandb/apis/normalize.py", line 24, in wrapper
+    return func(*args, **kwargs)
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/wandb/apis/public.py", line 520, in artifact
+    artifact = Artifact(self.client, entity, project, artifact_name)
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/wandb/apis/public.py", line 2583, in __init__
+    self._load()
+  File "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/lib/python3.9/site-packages/wandb/apis/public.py", line 3097, in _load
+    raise ValueError(
+wandb.errors.error.CommError: Project  ruilu/exercise_4 does not contain artifact: "genres_mod.parquet:latest
+"

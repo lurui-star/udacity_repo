@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-3/mlruns/0/819109262fae4bad95be984718ec40ff/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+name: ''
+run_id: 819109262fae4bad95be984718ec40ff
+run_uuid: 819109262fae4bad95be984718ec40ff
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705450438722
+status: 1
+tags: []
+user_id: ruilu

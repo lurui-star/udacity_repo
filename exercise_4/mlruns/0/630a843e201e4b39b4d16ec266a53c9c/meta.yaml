@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/630a843e201e4b39b4d16ec266a53c9c/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 630a843e201e4b39b4d16ec266a53c9c
+run_name: crawling-horse-233
+run_uuid: 630a843e201e4b39b4d16ec266a53c9c
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705866075316
+status: 1
+tags: []
+user_id: ruilu

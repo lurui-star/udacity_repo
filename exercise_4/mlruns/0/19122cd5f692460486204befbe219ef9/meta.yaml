@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/19122cd5f692460486204befbe219ef9/artifacts
+end_time: 1705864833062
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 19122cd5f692460486204befbe219ef9
+run_name: kindly-cub-176
+run_uuid: 19122cd5f692460486204befbe219ef9
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705864831091
+status: 4
+tags: []
+user_id: ruilu

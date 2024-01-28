@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/546c7e4df6ba497387ee67df0b824f7a/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 546c7e4df6ba497387ee67df0b824f7a
+run_name: upbeat-lynx-834
+run_uuid: 546c7e4df6ba497387ee67df0b824f7a
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705868789412
+status: 1
+tags: []
+user_id: ruilu

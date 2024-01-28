@@ -1,0 +1,43 @@
+2024-01-21 16:03:04,274 Downloading artifact
+Traceback (most recent call last):
+  File "pyarrow/pandas-shim.pxi", line 109, in pyarrow.lib._PandasAPIShim._check_import
+  File "pyarrow/pandas-shim.pxi", line 48, in pyarrow.lib._PandasAPIShim._import_pandas
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 1027, in <module>
+    'floating': np.float,
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/numpy/__init__.py", line 324, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+Exception ignored in: 'pyarrow.lib._PandasAPIShim._have_pandas_internal'
+Traceback (most recent call last):
+  File "pyarrow/pandas-shim.pxi", line 109, in pyarrow.lib._PandasAPIShim._check_import
+  File "pyarrow/pandas-shim.pxi", line 48, in pyarrow.lib._PandasAPIShim._import_pandas
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 1027, in <module>
+    'floating': np.float,
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/numpy/__init__.py", line 324, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations
+Traceback (most recent call last):
+  File "/Users/ruilu/udacity_repo/exercise_5/run.py", line 82, in <module>
+    go(args)
+  File "/Users/ruilu/udacity_repo/exercise_5/run.py", line 22, in go
+    df = pd.read_parquet(artifact_path)
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/pandas/io/parquet.py", line 459, in read_parquet
+    return impl.read(
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/pandas/io/parquet.py", line 221, in read
+    return self.api.parquet.read_table(
+  File "pyarrow/array.pxi", line 742, in pyarrow.lib._PandasConvertible.to_pandas
+  File "pyarrow/table.pxi", line 1582, in pyarrow.lib.Table._to_pandas
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/pyarrow/pandas_compat.py", line 1027, in <module>
+    'floating': np.float,
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/numpy/__init__.py", line 324, in __getattr__
+    raise AttributeError(__former_attrs__[attr])
+AttributeError: module 'numpy' has no attribute 'float'.
+`np.float` was a deprecated alias for the builtin `float`. To avoid this error in existing code, use `float` by itself. Doing this will not modify any behavior and is safe. If you specifically wanted the numpy scalar type, use `np.float64` here.
+The aliases was originally deprecated in NumPy 1.20; for more details and guidance see the original release note at:
+    https://numpy.org/devdocs/release/1.20.0-notes.html#deprecations

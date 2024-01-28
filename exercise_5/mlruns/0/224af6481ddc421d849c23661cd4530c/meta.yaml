@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/224af6481ddc421d849c23661cd4530c/artifacts
+end_time: 1705868462227
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 224af6481ddc421d849c23661cd4530c
+run_name: peaceful-swan-742
+run_uuid: 224af6481ddc421d849c23661cd4530c
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705868453458
+status: 4
+tags: []
+user_id: ruilu

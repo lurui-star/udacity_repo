@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/09da551d118247159afe8d701366440f/artifacts
+end_time: 1705868271815
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 09da551d118247159afe8d701366440f
+run_name: casual-robin-674
+run_uuid: 09da551d118247159afe8d701366440f
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705868263780
+status: 4
+tags: []
+user_id: ruilu

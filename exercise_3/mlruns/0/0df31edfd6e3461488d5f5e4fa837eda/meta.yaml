@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-3/mlruns/0/0df31edfd6e3461488d5f5e4fa837eda/artifacts
+end_time: 1705457906637
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 0df31edfd6e3461488d5f5e4fa837eda
+run_name: zealous-colt-209
+run_uuid: 0df31edfd6e3461488d5f5e4fa837eda
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705457897648
+status: 4
+tags: []
+user_id: ruilu

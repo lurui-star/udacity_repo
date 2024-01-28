@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/3912a46fc7264a9c9392eb32fc819eaf/artifacts
+end_time: 1705870994793
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 3912a46fc7264a9c9392eb32fc819eaf
+run_name: painted-horse-683
+run_uuid: 3912a46fc7264a9c9392eb32fc819eaf
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705870979166
+status: 4
+tags: []
+user_id: ruilu

@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/f824d28fe4e5452883c390cbbfcf0a54/artifacts
+end_time: 1705869064235
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: f824d28fe4e5452883c390cbbfcf0a54
+run_name: loud-seal-700
+run_uuid: f824d28fe4e5452883c390cbbfcf0a54
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705869056035
+status: 4
+tags: []
+user_id: ruilu

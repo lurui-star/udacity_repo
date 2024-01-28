@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/c84cd6d51f724131924318334f25dbb5/artifacts
+end_time: 1705867016846
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: c84cd6d51f724131924318334f25dbb5
+run_name: placid-hare-912
+run_uuid: c84cd6d51f724131924318334f25dbb5
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705866956036
+status: 4
+tags: []
+user_id: ruilu

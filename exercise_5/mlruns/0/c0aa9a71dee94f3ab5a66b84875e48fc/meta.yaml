@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/c0aa9a71dee94f3ab5a66b84875e48fc/artifacts
+end_time: 1705869386724
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: c0aa9a71dee94f3ab5a66b84875e48fc
+run_name: big-sloth-765
+run_uuid: c0aa9a71dee94f3ab5a66b84875e48fc
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705869378369
+status: 4
+tags: []
+user_id: ruilu

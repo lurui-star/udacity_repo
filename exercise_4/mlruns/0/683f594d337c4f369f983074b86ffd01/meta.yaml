@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/683f594d337c4f369f983074b86ffd01/artifacts
+end_time: 1705865490341
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 683f594d337c4f369f983074b86ffd01
+run_name: smiling-tern-7
+run_uuid: 683f594d337c4f369f983074b86ffd01
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705865488644
+status: 4
+tags: []
+user_id: ruilu

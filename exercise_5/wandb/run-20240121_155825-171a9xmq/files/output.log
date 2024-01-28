@@ -1,0 +1,31 @@
+2024-01-21 15:58:26,402 Downloading artifact
+wandb: ERROR Invalid artifact path: ruilu/exercise_4/genres_mod.parquet:v0/genres_mod.parquet
+Traceback (most recent call last):
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/wandb/apis/normalize.py", line 24, in wrapper
+    return func(*args, **kwargs)
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/wandb/apis/public.py", line 519, in artifact
+    entity, project, artifact_name = self._parse_artifact_path(name)
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/wandb/apis/public.py", line 333, in _parse_artifact_path
+    raise ValueError("Invalid artifact path: %s" % path)
+ValueError: Invalid artifact path: ruilu/exercise_4/genres_mod.parquet:v0/genres_mod.parquet
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/ruilu/udacity_repo/exercise_5/run.py", line 82, in <module>
+    go(args)
+  File "/Users/ruilu/udacity_repo/exercise_5/run.py", line 19, in go
+    artifact = run.use_artifact(args.input_artifact)
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/wandb/sdk/wandb_run.py", line 1957, in use_artifact
+    artifact = public_api.artifact(type=type, name=name)
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/wandb/apis/normalize.py", line 62, in wrapper
+    six.reraise(CommError, CommError(message, err), sys.exc_info()[2])
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/six.py", line 718, in reraise
+    raise value.with_traceback(tb)
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/wandb/apis/normalize.py", line 24, in wrapper
+    return func(*args, **kwargs)
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/wandb/apis/public.py", line 519, in artifact
+    entity, project, artifact_name = self._parse_artifact_path(name)
+  File "/Users/ruilu/anaconda3/envs/mlflow-f95237c9b9623e1e2bfc7b395c87651fb9071ef2/lib/python3.9/site-packages/wandb/apis/public.py", line 333, in _parse_artifact_path
+    raise ValueError("Invalid artifact path: %s" % path)
+wandb.errors.error.CommError: Invalid artifact path: ruilu/exercise_4/genres_mod.parquet:v0/genres_mod.parquet

@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/ea7f3be9d31840ecb0e0904f4b5cd153/artifacts
+end_time: 1705868119796
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: ea7f3be9d31840ecb0e0904f4b5cd153
+run_name: powerful-shark-791
+run_uuid: ea7f3be9d31840ecb0e0904f4b5cd153
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705868109920
+status: 4
+tags: []
+user_id: ruilu

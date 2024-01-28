@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/892aa542027b4014b3ce563f4a9894bd/artifacts
+end_time: 1705870710177
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 892aa542027b4014b3ce563f4a9894bd
+run_name: caring-goose-754
+run_uuid: 892aa542027b4014b3ce563f4a9894bd
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705870701951
+status: 4
+tags: []
+user_id: ruilu

@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/537a44746c7e4bb5a63ca2be428b8277/artifacts
+end_time: 1705865795872
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 537a44746c7e4bb5a63ca2be428b8277
+run_name: brawny-penguin-743
+run_uuid: 537a44746c7e4bb5a63ca2be428b8277
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705865794056
+status: 4
+tags: []
+user_id: ruilu

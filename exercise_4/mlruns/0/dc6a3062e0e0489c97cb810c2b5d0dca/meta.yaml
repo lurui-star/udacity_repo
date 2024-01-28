@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-4/mlruns/0/dc6a3062e0e0489c97cb810c2b5d0dca/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: dc6a3062e0e0489c97cb810c2b5d0dca
+run_name: vaunted-fish-817
+run_uuid: dc6a3062e0e0489c97cb810c2b5d0dca
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705785208341
+status: 1
+tags: []
+user_id: ruilu

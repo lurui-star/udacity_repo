@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/13c614796118444aa14a27ce73e7ce2b/artifacts
+end_time: 1705868235367
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 13c614796118444aa14a27ce73e7ce2b
+run_name: merciful-cod-603
+run_uuid: 13c614796118444aa14a27ce73e7ce2b
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705868225657
+status: 4
+tags: []
+user_id: ruilu

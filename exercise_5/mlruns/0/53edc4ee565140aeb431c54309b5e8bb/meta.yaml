@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_5/mlruns/0/53edc4ee565140aeb431c54309b5e8bb/artifacts
+end_time: 1705870079083
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 53edc4ee565140aeb431c54309b5e8bb
+run_name: likeable-bug-709
+run_uuid: 53edc4ee565140aeb431c54309b5e8bb
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1705870013882
+status: 4
+tags: []
+user_id: ruilu

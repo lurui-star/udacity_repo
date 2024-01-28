@@ -1,0 +1,31 @@
+{
+    "os": "macOS-12.3-x86_64-i386-64bit",
+    "python": "3.9.15",
+    "heartbeatAt": "2024-01-21T20:15:15.959043",
+    "startedAt": "2024-01-21T20:15:14.770933",
+    "docker": null,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [
+        "--input_artifact",
+        " ruilu/exercise_4/genres_mod.parquet:v0\n",
+        "--artifact_name",
+        "preprocessed_data.csv",
+        "--artifact_type",
+        "clean_data",
+        "--artifact_description",
+        "Data after preprocessing"
+    ],
+    "state": "running",
+    "program": "/Users/ruilu/udacity_repo/exercise_5/run.py",
+    "codePath": "exercise_5/run.py",
+    "git": {
+        "remote": "https://github.com/lurui87/udacity_repo.git",
+        "commit": "bdd8acc9e35c98ff697b7bfb31ed0be3fe43ef31"
+    },
+    "email": "lurui0421@gmail.com",
+    "root": "/Users/ruilu/udacity_repo",
+    "host": "Ruis-MBP.lan",
+    "username": "ruilu",
+    "executable": "/Users/ruilu/anaconda3/envs/mlflow-3be0523d42957576098f15edeaadf6d6e94ee675/bin/python"
+}
