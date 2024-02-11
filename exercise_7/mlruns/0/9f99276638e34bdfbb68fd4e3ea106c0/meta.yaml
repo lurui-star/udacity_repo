@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_7/mlruns/0/9f99276638e34bdfbb68fd4e3ea106c0/artifacts
+end_time: 1706148379627
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 9f99276638e34bdfbb68fd4e3ea106c0
+run_name: sassy-fish-596
+run_uuid: 9f99276638e34bdfbb68fd4e3ea106c0
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1706148365277
+status: 3
+tags: []
+user_id: ruilu

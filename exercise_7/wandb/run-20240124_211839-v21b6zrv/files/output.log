@@ -1,0 +1,40 @@
+[1m============================= test session starts ==============================
+platform darwin -- Python 3.11.5, pytest-7.4.0, pluggy-1.0.0 -- /Users/ruilu/anaconda3/bin/python
+cachedir: .pytest_cache
+rootdir: /Users/ruilu/udacity_repo/exercise_7
+plugins: anyio-3.5.0, typeguard-4.1.5
+[1mcollected 3 items                                                              
+test_data.py::test_column_presence_and_type [32mPASSED[33m                       [ 33%]
+test_data.py::test_class_names [32mPASSED[33m                                    [ 66%]
+test_data.py::test_column_ranges [32mPASSED[33m                                  [100%]
+[33m=============================== warnings summary ===============================
+../../anaconda3/lib/python3.11/site-packages/wandb/sdk/launch/builder/build.py:11
+  /Users/ruilu/anaconda3/lib/python3.11/site-packages/wandb/sdk/launch/builder/build.py:11: DeprecationWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html
+    import pkg_resources
+../../anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871
+  /Users/ruilu/anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871: DeprecationWarning: Deprecated call to `pkg_resources.declare_namespace('mpl_toolkits')`.
+  Implementing implicit namespace packages (as specified in PEP 420) is preferred to `pkg_resources.declare_namespace`. See https://setuptools.pypa.io/en/latest/references/keywords.html#keyword-namespace-packages
+    declare_namespace(pkg)
+../../anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871
+  /Users/ruilu/anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871: DeprecationWarning: Deprecated call to `pkg_resources.declare_namespace('google')`.
+  Implementing implicit namespace packages (as specified in PEP 420) is preferred to `pkg_resources.declare_namespace`. See https://setuptools.pypa.io/en/latest/references/keywords.html#keyword-namespace-packages
+    declare_namespace(pkg)
+../../anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871
+  /Users/ruilu/anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871: DeprecationWarning: Deprecated call to `pkg_resources.declare_namespace('ruamel')`.
+  Implementing implicit namespace packages (as specified in PEP 420) is preferred to `pkg_resources.declare_namespace`. See https://setuptools.pypa.io/en/latest/references/keywords.html#keyword-namespace-packages
+    declare_namespace(pkg)
+../../anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871
+../../anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871
+../../anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871
+../../anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871
+../../anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871
+../../anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871
+  /Users/ruilu/anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871: DeprecationWarning: Deprecated call to `pkg_resources.declare_namespace('sphinxcontrib')`.
+  Implementing implicit namespace packages (as specified in PEP 420) is preferred to `pkg_resources.declare_namespace`. See https://setuptools.pypa.io/en/latest/references/keywords.html#keyword-namespace-packages
+    declare_namespace(pkg)
+../../anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871
+  /Users/ruilu/anaconda3/lib/python3.11/site-packages/pkg_resources/__init__.py:2871: DeprecationWarning: Deprecated call to `pkg_resources.declare_namespace('zope')`.
+  Implementing implicit namespace packages (as specified in PEP 420) is preferred to `pkg_resources.declare_namespace`. See https://setuptools.pypa.io/en/latest/references/keywords.html#keyword-namespace-packages
+    declare_namespace(pkg)
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+[33m======================== [32m3 passed[39m, [33m[1m11 warnings[22m in 8.79s ========================

@@ -1,0 +1,18 @@
+[1mcollecting 3 items                                                             [0m[1mcollected 3 items                                                              [0m
+
+test_data.py::test_column_presence_and_type [32mPASSED[0m
+test_data.py::test_class_names [32mPASSED[0m
+test_data.py::test_column_ranges [32mPASSED[0m
+
+[33m=============================== warnings summary ===============================[0m
+../../anaconda3/envs/mlflow-f62a2dea99f2737b25265029c0b0d460ee47acfb/lib/python3.9/site-packages/wandb/vendor/watchdog/utils/bricks.py:175
+  /Users/ruilu/anaconda3/envs/mlflow-f62a2dea99f2737b25265029c0b0d460ee47acfb/lib/python3.9/site-packages/wandb/vendor/watchdog/utils/bricks.py:175: DeprecationWarning: Using or importing the ABCs from 'collections' instead of from 'collections.abc' is deprecated since Python 3.3, and in 3.10 it will stop working
+    class OrderedSet(collections.MutableSet):
+
+test_data.py::test_class_names
+  /Users/ruilu/anaconda3/envs/mlflow-f62a2dea99f2737b25265029c0b0d460ee47acfb/lib/python3.9/site-packages/pandas/core/algorithms.py:485: DeprecationWarning: np.find_common_type is deprecated.  Please use `np.result_type` or `np.promote_types`.
+  See https://numpy.org/devdocs/release/1.25.0-notes.html and the docs for more information.  (Deprecated NumPy 1.25)
+    common = np.find_common_type([values.dtype, comps.dtype], [])
+
+-- Docs: https://docs.pytest.org/en/stable/warnings.html
+[33m======================== [32m3 passed[0m, [33m[1m2 warnings[0m[33m in 3.32s[0m[33m =========================[0m

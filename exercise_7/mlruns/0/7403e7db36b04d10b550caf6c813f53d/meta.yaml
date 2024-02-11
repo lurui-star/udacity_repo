@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_7/mlruns/0/7403e7db36b04d10b550caf6c813f53d/artifacts
+end_time: 1706148027008
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 7403e7db36b04d10b550caf6c813f53d
+run_name: clean-stoat-417
+run_uuid: 7403e7db36b04d10b550caf6c813f53d
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1706147974009
+status: 4
+tags: []
+user_id: ruilu

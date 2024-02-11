@@ -1,0 +1,10 @@
+2021-05-05 22:20:47,299 Downloading and reading train artifact
+2021-05-05 22:20:48,054 Extracting target from dataframe
+2021-05-05 22:20:48,058 Splitting train/val
+2021-05-05 22:20:48,085 Setting up pipeline
+Traceback (most recent call last):
+  File "run.py", line 182, in <module>
+    go(args)
+  File "run.py", line 43, in go
+    pipe = get_training_inference_pipeline(args)
+NameError: name 'get_training_inference_pipeline' is not defined

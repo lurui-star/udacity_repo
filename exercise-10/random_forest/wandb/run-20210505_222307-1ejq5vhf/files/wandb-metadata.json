@@ -1,0 +1,29 @@
+{
+    "os": "Linux-5.4.0-72-generic-x86_64-with-glibc2.10",
+    "python": "3.8.8",
+    "heartbeatAt": "2021-05-06T05:23:07.816953",
+    "startedAt": "2021-05-06T05:23:07.188037",
+    "docker": null,
+    "gpu": "Quadro P2000",
+    "gpu_count": 1,
+    "cpu_count": 12,
+    "cuda": null,
+    "args": [
+        "--train_data",
+        "exercise_6/data_train.csv:latest",
+        "--model_config",
+        "/home/giacomov/udacity/repo/nd0821-c2-build-model-workflow/lesson-4-training-validation-experiment-tracking/exercises/exercise_10/solution/outputs/2021-05-05/22-23-05/random_forest_config.json"
+    ],
+    "state": "running",
+    "program": "run.py",
+    "codePath": "lesson-4-training-validation-experiment-tracking/exercises/exercise_10/solution/random_forest/run.py",
+    "git": {
+        "remote": "https://github.com/udacity/nd0821-c2-build-model-workflow.git",
+        "commit": "d9121aba874faf319139d387fff5cd03a807ea12"
+    },
+    "email": "giacomo@capeanalytics.com",
+    "root": "/home/giacomov/udacity/repo/nd0821-c2-build-model-workflow",
+    "host": "pluto",
+    "username": "giacomov",
+    "executable": "/home/giacomov/miniconda3/envs/mlflow-04dc18e87776aad288f8cabb3fd2dc65eef7059f/bin/python"
+}

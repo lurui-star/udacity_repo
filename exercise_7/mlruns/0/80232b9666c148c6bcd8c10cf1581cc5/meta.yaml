@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_7/mlruns/0/80232b9666c148c6bcd8c10cf1581cc5/artifacts
+end_time: 1706147925813
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 80232b9666c148c6bcd8c10cf1581cc5
+run_name: clumsy-conch-631
+run_uuid: 80232b9666c148c6bcd8c10cf1581cc5
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1706147916277
+status: 4
+tags: []
+user_id: ruilu

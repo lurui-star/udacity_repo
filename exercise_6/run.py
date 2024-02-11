@@ -36,14 +36,14 @@ def go(args):
 
     # Save the artifacts. We use a temporary directory so we do not leave
     # any trace behind
-    with tempfile.TemporaryDirectory() as tmp_dir:
+   
 
         for split, df in splits.items():
 
             # Make the artifact name from the provided root plus the name of the split
             artifact_name = f"{args.artifact_root}_{split}.csv"
 
-            # Get the path on disk within the temp directory
+            # Get the path on disk within the with tempfile.TemporaryDirectory() as tmp_dir: temp directory
             temp_path = os.path.join(tmp_dir, artifact_name)
 
             logger.info(f"Uploading the {split} dataset to {artifact_name}")

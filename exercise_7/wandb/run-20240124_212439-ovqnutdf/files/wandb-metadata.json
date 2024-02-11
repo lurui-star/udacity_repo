@@ -1,0 +1,47 @@
+{
+    "os": "macOS-10.16-x86_64-i386-64bit",
+    "python": "3.11.5",
+    "heartbeatAt": "2024-01-25T02:24:40.431762",
+    "startedAt": "2024-01-25T02:24:39.715561",
+    "docker": null,
+    "cuda": null,
+    "args": [
+        ".",
+        "-vv"
+    ],
+    "state": "running",
+    "program": "/Users/ruilu/anaconda3/bin/pytest",
+    "codePathLocal": null,
+    "git": {
+        "remote": "https://github.com/lurui87/udacity_repo.git",
+        "commit": "2fb4672f8bc640148758f48caf119b8a8e56a13a"
+    },
+    "email": "lurui0421@gmail.com",
+    "root": "/Users/ruilu/udacity_repo",
+    "host": "Ruis-MBP.lan",
+    "username": "ruilu",
+    "executable": "/Users/ruilu/anaconda3/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 2400,
+        "min": 2400,
+        "max": 2400
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 2400,
+            "min": 2400,
+            "max": 2400
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 460.4317207336426,
+            "used": 125.7287826538086
+        }
+    },
+    "memory": {
+        "total": 16.0
+    }
+}

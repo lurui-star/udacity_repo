@@ -1,0 +1,27 @@
+{
+    "os": "macOS-10.16-x86_64-i386-64bit",
+    "python": "3.8.18",
+    "heartbeatAt": "2024-01-27T21:30:55.368019",
+    "startedAt": "2024-01-27T21:30:54.466291",
+    "docker": null,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [
+        "--train_data",
+        "exercise_6/data_train.csv:latest",
+        "--model_config",
+        "/Users/ruilu/udacity_repo/exercise-10/outputs/2024-01-27/16-29-35/random_forest_config.json"
+    ],
+    "state": "running",
+    "program": "run.py",
+    "codePath": "exercise-10/random_forest/run.py",
+    "git": {
+        "remote": "https://github.com/lurui87/udacity_repo.git",
+        "commit": "2fb4672f8bc640148758f48caf119b8a8e56a13a"
+    },
+    "email": "lurui0421@gmail.com",
+    "root": "/Users/ruilu/udacity_repo",
+    "host": "Ruis-MBP.lan",
+    "username": "ruilu",
+    "executable": "/Users/ruilu/anaconda3/envs/mlflow-685b1cbbf521fb7dd3ffe871e55c723975f762b1/bin/python"
+}

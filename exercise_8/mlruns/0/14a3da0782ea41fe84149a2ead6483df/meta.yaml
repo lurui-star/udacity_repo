@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_8/mlruns/0/14a3da0782ea41fe84149a2ead6483df/artifacts
+end_time: 1706388457366
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 14a3da0782ea41fe84149a2ead6483df
+run_name: ambitious-stork-559
+run_uuid: 14a3da0782ea41fe84149a2ead6483df
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1706388389857
+status: 4
+tags: []
+user_id: ruilu

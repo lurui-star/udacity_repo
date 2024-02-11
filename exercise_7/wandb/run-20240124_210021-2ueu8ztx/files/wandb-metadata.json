@@ -1,0 +1,25 @@
+{
+    "os": "macOS-12.3-x86_64-i386-64bit",
+    "python": "3.9.18",
+    "heartbeatAt": "2024-01-25T02:00:22.189062",
+    "startedAt": "2024-01-25T02:00:21.138565",
+    "docker": null,
+    "cpu_count": 8,
+    "cuda": null,
+    "args": [
+        "-s",
+        "-vv",
+        "."
+    ],
+    "state": "running",
+    "program": "<python with no main file>",
+    "git": {
+        "remote": "https://github.com/lurui87/udacity_repo.git",
+        "commit": "2fb4672f8bc640148758f48caf119b8a8e56a13a"
+    },
+    "email": "lurui0421@gmail.com",
+    "root": "/Users/ruilu/udacity_repo",
+    "host": "Ruis-MBP.lan",
+    "username": "ruilu",
+    "executable": "/Users/ruilu/anaconda3/envs/mlflow-f62a2dea99f2737b25265029c0b0d460ee47acfb/bin/python"
+}

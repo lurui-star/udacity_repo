@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_7/mlruns/0/45577e518cd74e868b4c67c5af8d422d/artifacts
+end_time: 1706147724091
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: 45577e518cd74e868b4c67c5af8d422d
+run_name: righteous-flea-178
+run_uuid: 45577e518cd74e868b4c67c5af8d422d
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1706147664314
+status: 4
+tags: []
+user_id: ruilu

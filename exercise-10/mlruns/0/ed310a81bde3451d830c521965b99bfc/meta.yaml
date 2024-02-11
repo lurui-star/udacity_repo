@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise-10/mlruns/0/ed310a81bde3451d830c521965b99bfc/artifacts
+end_time: 1706390592221
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: ed310a81bde3451d830c521965b99bfc
+run_name: mysterious-carp-822
+run_uuid: ed310a81bde3451d830c521965b99bfc
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1706390581462
+status: 4
+tags: []
+user_id: ruilu

@@ -1,0 +1,15 @@
+artifact_uri: file:///Users/ruilu/udacity_repo/exercise_7/mlruns/0/e1ef0ed8726e4c2eac5cfc1f63141d65/artifacts
+end_time: 1706148111613
+entry_point_name: ''
+experiment_id: '0'
+lifecycle_stage: active
+run_id: e1ef0ed8726e4c2eac5cfc1f63141d65
+run_name: upbeat-vole-241
+run_uuid: e1ef0ed8726e4c2eac5cfc1f63141d65
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1706148103439
+status: 4
+tags: []
+user_id: ruilu

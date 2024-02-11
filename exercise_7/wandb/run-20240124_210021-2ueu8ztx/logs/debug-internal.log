@@ -1,0 +1,99 @@
+2024-01-24 21:00:21,653 INFO    MainThread:4595 [internal.py:wandb_internal():88] W&B internal server running at pid: 4595, started at: 2024-01-24 21:00:21.653076
+2024-01-24 21:00:21,654 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: check_version
+2024-01-24 21:00:21,654 DEBUG   SenderThread:4595 [sender.py:send():122] send: header
+2024-01-24 21:00:21,654 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:21,654 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: check_version
+2024-01-24 21:00:21,654 INFO    WriterThread:4595 [datastore.py:open_for_write():77] open: /Users/ruilu/udacity_repo/exercise_7/wandb/run-20240124_210021-2ueu8ztx/run-2ueu8ztx.wandb
+2024-01-24 21:00:21,776 DEBUG   SenderThread:4595 [sender.py:send():122] send: run
+2024-01-24 21:00:22,186 INFO    SenderThread:4595 [sender.py:_start_run_threads():596] run started: 2ueu8ztx with start time 1706148021
+2024-01-24 21:00:22,187 DEBUG   SenderThread:4595 [sender.py:send():122] send: summary
+2024-01-24 21:00:22,187 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: run_start
+2024-01-24 21:00:22,188 INFO    SenderThread:4595 [sender.py:_save_file():730] saving file wandb-summary.json with policy end
+2024-01-24 21:00:22,188 DEBUG   HandlerThread:4595 [meta.py:__init__():34] meta init
+2024-01-24 21:00:22,188 DEBUG   HandlerThread:4595 [meta.py:__init__():48] meta init done
+2024-01-24 21:00:22,189 DEBUG   HandlerThread:4595 [meta.py:probe():190] probe
+2024-01-24 21:00:22,197 DEBUG   HandlerThread:4595 [meta.py:_setup_git():180] setup git
+2024-01-24 21:00:22,233 DEBUG   HandlerThread:4595 [meta.py:_setup_git():187] setup git done
+2024-01-24 21:00:22,233 DEBUG   HandlerThread:4595 [meta.py:_save_pip():52] save pip
+2024-01-24 21:00:22,233 DEBUG   HandlerThread:4595 [meta.py:_save_pip():66] save pip done
+2024-01-24 21:00:22,233 DEBUG   HandlerThread:4595 [meta.py:probe():231] probe done
+2024-01-24 21:00:22,236 DEBUG   SenderThread:4595 [sender.py:send():122] send: files
+2024-01-24 21:00:22,236 INFO    SenderThread:4595 [sender.py:_save_file():730] saving file wandb-metadata.json with policy now
+2024-01-24 21:00:22,239 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: status
+2024-01-24 21:00:22,239 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:22,239 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: status
+2024-01-24 21:00:23,548 DEBUG   SenderThread:4595 [sender.py:send():122] send: telemetry
+2024-01-24 21:00:23,550 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: poll_exit
+2024-01-24 21:00:23,816 DEBUG   SenderThread:4595 [sender.py:send():122] send: exit
+2024-01-24 21:00:23,816 INFO    SenderThread:4595 [sender.py:send_exit():200] handling exit code: 0
+2024-01-24 21:00:23,816 INFO    SenderThread:4595 [sender.py:send_exit():208] send defer
+2024-01-24 21:00:23,817 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:23,817 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: poll_exit
+2024-01-24 21:00:23,817 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: defer
+2024-01-24 21:00:23,817 INFO    HandlerThread:4595 [handler.py:handle_request_defer():115] handle defer: 0
+2024-01-24 21:00:23,817 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:23,818 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: defer
+2024-01-24 21:00:23,818 INFO    SenderThread:4595 [sender.py:send_request_defer():217] handle sender defer: 0
+2024-01-24 21:00:23,818 INFO    SenderThread:4595 [sender.py:send_request_defer():253] send defer: 1
+2024-01-24 21:00:23,818 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: defer
+2024-01-24 21:00:23,818 INFO    HandlerThread:4595 [handler.py:handle_request_defer():115] handle defer: 1
+2024-01-24 21:00:23,877 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:23,877 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: defer
+2024-01-24 21:00:23,877 INFO    SenderThread:4595 [sender.py:send_request_defer():217] handle sender defer: 1
+2024-01-24 21:00:23,877 INFO    SenderThread:4595 [sender.py:send_request_defer():253] send defer: 2
+2024-01-24 21:00:23,878 DEBUG   SenderThread:4595 [sender.py:send():122] send: stats
+2024-01-24 21:00:23,878 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: defer
+2024-01-24 21:00:23,878 INFO    HandlerThread:4595 [handler.py:handle_request_defer():115] handle defer: 2
+2024-01-24 21:00:23,878 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:23,878 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: defer
+2024-01-24 21:00:23,878 INFO    SenderThread:4595 [sender.py:send_request_defer():217] handle sender defer: 2
+2024-01-24 21:00:23,878 INFO    SenderThread:4595 [sender.py:send_request_defer():253] send defer: 3
+2024-01-24 21:00:23,879 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: defer
+2024-01-24 21:00:23,879 INFO    HandlerThread:4595 [handler.py:handle_request_defer():115] handle defer: 3
+2024-01-24 21:00:23,879 DEBUG   SenderThread:4595 [sender.py:send():122] send: summary
+2024-01-24 21:00:23,879 INFO    SenderThread:4595 [sender.py:_save_file():730] saving file wandb-summary.json with policy end
+2024-01-24 21:00:23,879 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:23,879 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: defer
+2024-01-24 21:00:23,879 INFO    SenderThread:4595 [sender.py:send_request_defer():217] handle sender defer: 3
+2024-01-24 21:00:23,880 INFO    SenderThread:4595 [sender.py:send_request_defer():253] send defer: 4
+2024-01-24 21:00:23,880 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: defer
+2024-01-24 21:00:23,880 INFO    HandlerThread:4595 [handler.py:handle_request_defer():115] handle defer: 4
+2024-01-24 21:00:23,880 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:23,880 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: defer
+2024-01-24 21:00:23,880 INFO    SenderThread:4595 [sender.py:send_request_defer():217] handle sender defer: 4
+2024-01-24 21:00:24,203 INFO    SenderThread:4595 [sender.py:send_request_defer():253] send defer: 5
+2024-01-24 21:00:24,207 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: defer
+2024-01-24 21:00:24,210 INFO    HandlerThread:4595 [handler.py:handle_request_defer():115] handle defer: 5
+2024-01-24 21:00:24,213 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:24,214 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: defer
+2024-01-24 21:00:24,214 INFO    SenderThread:4595 [sender.py:send_request_defer():217] handle sender defer: 5
+2024-01-24 21:00:24,215 INFO    SenderThread:4595 [sender.py:send_request_defer():253] send defer: 6
+2024-01-24 21:00:24,216 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: defer
+2024-01-24 21:00:24,216 INFO    HandlerThread:4595 [handler.py:handle_request_defer():115] handle defer: 6
+2024-01-24 21:00:24,217 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:24,217 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: defer
+2024-01-24 21:00:24,217 INFO    SenderThread:4595 [sender.py:send_request_defer():217] handle sender defer: 6
+2024-01-24 21:00:25,110 INFO    SenderThread:4595 [sender.py:send_request_defer():253] send defer: 7
+2024-01-24 21:00:25,110 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: defer
+2024-01-24 21:00:25,110 INFO    HandlerThread:4595 [handler.py:handle_request_defer():115] handle defer: 7
+2024-01-24 21:00:25,111 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:25,111 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: defer
+2024-01-24 21:00:25,111 INFO    SenderThread:4595 [sender.py:send_request_defer():217] handle sender defer: 7
+2024-01-24 21:00:25,111 INFO    SenderThread:4595 [sender.py:send_request_defer():253] send defer: 8
+2024-01-24 21:00:25,111 DEBUG   SenderThread:4595 [sender.py:send():122] send: final
+2024-01-24 21:00:25,111 DEBUG   SenderThread:4595 [sender.py:send():122] send: footer
+2024-01-24 21:00:25,111 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: defer
+2024-01-24 21:00:25,112 INFO    HandlerThread:4595 [handler.py:handle_request_defer():115] handle defer: 8
+2024-01-24 21:00:25,112 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:25,112 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: defer
+2024-01-24 21:00:25,112 INFO    SenderThread:4595 [sender.py:send_request_defer():217] handle sender defer: 8
+2024-01-24 21:00:25,826 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: poll_exit
+2024-01-24 21:00:25,827 DEBUG   SenderThread:4595 [sender.py:send():122] send: request
+2024-01-24 21:00:25,827 DEBUG   SenderThread:4595 [sender.py:send_request():131] send_request: poll_exit
+2024-01-24 21:00:25,831 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: get_summary
+2024-01-24 21:00:25,832 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: sampled_history
+2024-01-24 21:00:25,832 DEBUG   HandlerThread:4595 [handler.py:handle_request():101] handle_request: shutdown
+2024-01-24 21:00:25,833 INFO    HandlerThread:4595 [handler.py:finish():535] shutting down handler
+2024-01-24 21:00:26,117 INFO    WriterThread:4595 [datastore.py:close():258] close: /Users/ruilu/udacity_repo/exercise_7/wandb/run-20240124_210021-2ueu8ztx/run-2ueu8ztx.wandb
+2024-01-24 21:00:26,831 INFO    SenderThread:4595 [sender.py:finish():833] shutting down sender
+2024-01-24 21:00:26,835 INFO    MainThread:4595 [internal.py:handle_exit():78] Internal process exited
