@@ -1,0 +1,19 @@
+2024-08-25 20:18:39,108 - root - INFO: Testing import_data: SUCCESS
+2024-08-25 20:18:39,108 - root - INFO: Rows: 10127	Columns: 22
+2024-08-25 20:18:39,910 - root - INFO: Testing perform_eda: SUCCESS
+2024-08-25 20:18:39,910 - root - INFO: File churn_distribution.png was found
+2024-08-25 20:18:39,910 - root - INFO: File customer_age_distribution.png was found
+2024-08-25 20:18:39,910 - root - INFO: File marital_status_distribution.png was found
+2024-08-25 20:18:39,910 - root - INFO: File total_transaction_distribution.png was found
+2024-08-25 20:18:39,910 - root - INFO: File heatmap.png was found
+2024-08-25 20:18:39,932 - root - INFO: Testing encoder_helper(data_frame, category_lst=[]): SUCCESS
+2024-08-25 20:18:39,940 - root - INFO: Testing encoder_helper(data_frame, category_lst=cat_columns, response=None): SUCCESS
+2024-08-25 20:18:39,947 - root - INFO: Testing encoder_helper(data_frame, category_lst=cat_columns, response='Churn'): SUCCESS
+2024-08-25 20:18:40,027 - root - INFO: Testing perform_feature_engineering. `Churn` column is present: SUCCESS
+2024-08-25 20:18:40,027 - root - INFO: Testing perform_feature_engineering. DataFrame sizes are consistent: SUCCESS
+2024-08-25 20:19:13,934 - root - INFO: File logistic_model.pkl was found
+2024-08-25 20:19:13,935 - root - INFO: File rfc_model.pkl was found
+2024-08-25 20:19:13,935 - root - INFO: File roc_curve_result.png was found
+2024-08-25 20:19:13,935 - root - INFO: File rf_results.png was found
+2024-08-25 20:19:13,935 - root - INFO: File logistic_results.png was foond
+2024-08-25 20:19:13,935 - root - INFO: File feature_importances.png was found
